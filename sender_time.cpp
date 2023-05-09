@@ -1,3 +1,6 @@
+// compile option
+// g++ -std=c++14 -O2 ./sender_time.cpp -o sender_time
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -60,7 +63,7 @@ int main()
     fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     fmt.fmt.pix.width = 640;
     fmt.fmt.pix.height = 480;
-    fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_RGB24;
+    fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_BGR24;
     fmt.fmt.pix.field = V4L2_FIELD_ANY;
     if (ioctl(fd, VIDIOC_S_FMT, &fmt) < 0)
     {
