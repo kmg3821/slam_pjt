@@ -1,166 +1,106 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <sys/ioctl.h>
-#include <sys/mman.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
+// compile option
+// g++ -std=c++14 -O2 ./sender.cpp -o ./sender -L/usr/local/include/opencv2/ -lopencv_videoio -lopencv_core -lopencv_imgcodecs
+
+#include <iostream>
+#include <cstring>
+#include <cstdlib>
 #include <arpa/inet.h>
-#include <linux/videodev2.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#include <opencv2/opencv.hpp>
 
-#define WIDTH 640
-#define HEIGHT 480
-#define BUFFER_SIZE (WIDTH * HEIGHT * 3)
+#include <opencv2/core.hpp>
+#include <opencv2/videoio/videoio_c.h>
+#include <opencv2/videoio.hpp>
+#include <opencv2/highgui.hpp>
+#include <chrono>
 
-int main(int argc, char **argv)
-{
-    int fd;
-    struct v4l2_capability cap;
-    struct v4l2_format format;
-    struct v4l2_requestbuffers req;
-    struct v4l2_buffer buf;
-    unsigned char *buffer;
-    fd_set fds;
-    struct timeval tv;
-    int sock, ret;
-    struct sockaddr_in servaddr;
-    int counter = 0;
 
-    // Open the video device
-    fd = open("/dev/video0", O_RDWR);
-    if (fd < 0)
-    {
-        perror("Failed to open device");
-        exit(EXIT_FAILURE);
+using namespace std;
+using namespace cv;
+
+int main() {
+    // create a socket
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock == -1) {
+        cerr << "Failed to create socket." << endl;
+        return EXIT_FAILURE;
     }
 
-    // Get the device capabilities
-    if (ioctl(fd, VIDIOC_QUERYCAP, &cap) < 0)
-    {
-        perror("Failed to get device capabilities");
-        exit(EXIT_FAILURE);
+    // specify the address and port of the server to connect to
+    struct sockaddr_in server_address;
+    memset(&server_address, 0, sizeof(server_address));
+    server_address.sin_family = AF_INET;
+    server_address.sin_port = htons(8080);
+    inet_pton(AF_INET, "192.168.219.159", &server_address.sin_addr);
+
+    // connect to the server
+    if (connect(sock, (struct sockaddr *)&server_address, sizeof(server_address)) == -1) {
+        cerr << "Failed to connect to server." << endl;
+        return EXIT_FAILURE;
     }
 
-    // Set the device format
-    memset(&format, 0, sizeof(format));
-    format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    format.fmt.pix.width = WIDTH;
-    format.fmt.pix.height = HEIGHT;
-    format.fmt.pix.pixelformat = V4L2_PIX_FMT_BGR24;
-    if (ioctl(fd, VIDIOC_S_FMT, &format) < 0)
-    {
-        perror("Failed to set device format");
-        exit(EXIT_FAILURE);
+    // send the images
+    VideoCapture cap("/dev/video0");
+    if (!cap.isOpened()) {
+        cerr << "Failed to open video file." << endl;
+        return EXIT_FAILURE;
     }
 
-    // Request buffers from the device
-    memset(&req, 0, sizeof(req));
-    req.count = 1;
-    req.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    req.memory = V4L2_MEMORY_MMAP;
-    if (ioctl(fd, VIDIOC_REQBUFS, &req) < 0)
-    {
-        perror("Failed to request buffers from device");
-        exit(EXIT_FAILURE);
-    }
+    system("v4l2-ctl -c iso_sensitivity_auto=0"); // manual mode
+    system("v4l2-ctl -c image_stabilization=1");  // 흔들림 방지
+    system("v4l2-ctl -c scene_mode=0");           // 촬영모드, 0: None, 8: Night, 11: Sports
+    system("v4l2-ctl -c sharpness=100");          // 예리함 정도
+    // system("v4l2-ctl -c color_effects=1"); // gray color
 
-    // Map the buffer from the device
-    memset(&buf, 0, sizeof(buf));
-    buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    buf.memory = V4L2_MEMORY_MMAP;
-    buf.index = 0;
-    if (ioctl(fd, VIDIOC_QUERYBUF, &buf) < 0)
-    {
-        perror("Failed to query buffer from device");
-        exit(EXIT_FAILURE);
-    }
-    buffer = (unsigned char *)mmap(NULL, buf.length, PROT_READ | PROT_WRITE, MAP_SHARED, fd, buf.m.offset);
-    if (buffer == MAP_FAILED)
-    {
-        perror("Failed to map buffer from device");
-        exit(EXIT_FAILURE);
-    }
+    cap.set(CV_CAP_PROP_FPS, 25); // default = 20
 
-    // Connect to the server
-    sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock < 0)
-    {
-        perror("Failed to create socket");
-        exit(EXIT_FAILURE);
-    }
-    memset(&servaddr, 0, sizeof(servaddr));
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_port = htons(8080);
-    inet_pton(AF_INET, "127.0.0.1", &servaddr.sin_addr);
-    if (connect(sock, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0)
-    {
-        perror("Failed to connect to server");
-        exit(EXIT_FAILURE);
-    }
+    cap.set(CV_CAP_PROP_BRIGHTNESS, 60); // 0 ~ 100, default = 50
+    cap.set(CAP_PROP_CONTRAST, 10);       // -100 ~ 100, default = 0
+    cap.set(CV_CAP_PROP_SATURATION, 0);  // -100 ~ 100, default = 0
 
-    // Main loop
-    while (1)
+    cap.set(CAP_PROP_AUTO_EXPOSURE, 1); // 0: Auto, 1: Manual
+    cap.set(CAP_PROP_EXPOSURE, 50);     // 1 ~ 10000, default = 1000
+    cap.set(CV_CAP_PROP_ISO_SPEED, 4);  // 0 ~ 4, default = 0
+
+    for(int i = 0; i < 20; ++i)
     {
-        // Select on the video device file descriptor
-        FD_ZERO(&fds);
-        FD_SET(fd, &fds);
-        tv.tv_sec = 0;
-        tv.tv_usec = 40000; // 25 fps
-        ret = select(fd + 1, &fds, NULL, NULL, &tv);
-        if (ret < 0)
+        auto st = chrono::steady_clock::now();
+
+        Mat frame;
+        cap.read(frame);
+        if (frame.empty())
         {
-            perror("Failed to select on device file descriptor");
-            exit(EXIT_FAILURE);
-        }
-        if (ret == 0)
-        {
-            // Timeout occurred, try again
-            continue;
+            cerr << "ERROR! blank frame grabbed\n";
+            break;
         }
 
-        // Dequeue a buffer from the device
-        memset(&buf, 0, sizeof(buf));
-        buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-        buf.memory = V4L2_MEMORY_MMAP;
-        if (ioctl(fd, VIDIOC_DQBUF, &buf) < 0)
-        {
-            perror("Failed to dequeue buffer from device");
-            exit(EXIT_FAILURE);
+        vector<uchar> buffer;
+        imencode(".jpg", frame, buffer);
+        int buffer_size = buffer.size();
+        cout << buffer_size << endl;
+        int bytes_sent = send(sock, &buffer_size, sizeof(buffer_size), 0);
+        if (bytes_sent == -1) {
+            cerr << "Failed to send buffer size." << endl;
+            return EXIT_FAILURE;
+        }
+        bytes_sent = send(sock, buffer.data(), buffer_size, 0);
+        if (bytes_sent == -1) {
+            cerr << "Failed to send image data." << endl;
+            return EXIT_FAILURE;
         }
 
-        // Send the buffer over TCP/IP
-        ret = send(sock, buffer, BUFFER_SIZE, 0);
-        if (ret < 0)
-        {
-            perror("Failed to send buffer over TCP/IP");
-            exit(EXIT_FAILURE);
-        }
+        auto et = chrono::steady_clock::now();
 
-        // Queue the buffer back to the device
-        if (ioctl(fd, VIDIOC_QBUF, &buf) < 0)
-        {
-            perror("Failed to queue buffer back to device");
-            exit(EXIT_FAILURE);
-        }
+        auto dt = chrono::duration_cast<chrono::milliseconds>(et - st).count();
+        cout << "Elapsed time in milliseconds: " << dt << " ms" << endl;
 
-        // Print a message every 100 frames
-        counter++;
-        if (counter % 100 == 0)
-        {
-            printf("Sent frame %d\n", counter);
-        }
+        usleep(1000 * 1000);
     }
 
-    // Close the socket
+    // close the socket and video capture
     close(sock);
+    cap.release();
 
-    // Unmap the buffer from the device
-    munmap(buffer, buf.length);
-
-    // Close the video device
-    close(fd);
-
-    return 0;
+    return EXIT_SUCCESS;
 }

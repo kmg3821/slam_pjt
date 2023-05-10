@@ -16,7 +16,7 @@
 
 #define BUFFER_SIZE 640 * 480 * 3 // Size of the image buffer
 #define PORT 8080                 // Port number to send data to
-#define IP_ADDRESS "192.168.26.33"    // IP address of the server
+#define IP_ADDRESS "192.168.219.159"    // IP address of the server
 
 // Custom struct that combines the timestamp and image data
 struct ImagePacket
