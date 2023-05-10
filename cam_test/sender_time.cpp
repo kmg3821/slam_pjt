@@ -16,7 +16,7 @@
 
 #define BUFFER_SIZE 640 * 480 * 3 // Size of the image buffer
 #define PORT 8080                 // Port number to send data to
-#define IP_ADDRESS "127.0.0.1"    // IP address of the server
+#define IP_ADDRESS "192.168.26.33"    // IP address of the server
 
 // Custom struct that combines the timestamp and image data
 struct ImagePacket
@@ -125,8 +125,8 @@ int main()
     {
         FD_ZERO(&fds);
         FD_SET(fd, &fds);
-        tv.tv_sec = 2;
-        tv.tv_usec = 0;
+        tv.tv_sec = 0;
+        tv.tv_usec = 40000;
         ret = select(fd + 1, &fds, NULL, NULL, &tv);
         if (ret < 0)
         {
@@ -143,7 +143,7 @@ int main()
         memset(&buf, 0, sizeof(buf));
         buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         buf.memory = V4L2_MEMORY_MMAP;
-        if (ioctl(fd, VIDIOC_DQBUF, &buf) < 0)
+        if (ioctl(fd, VIDIOC_DQBUF, &buf) < 0) // 여기서 에러남
         {
             perror("Failed to dequeue buffer from device");
             exit(EXIT_FAILURE);

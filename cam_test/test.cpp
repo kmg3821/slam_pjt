@@ -25,8 +25,8 @@ int main()
 
     cap.set(CV_CAP_PROP_FPS, 25); // default = 20
 
-    cap.set(CV_CAP_PROP_BRIGHTNESS, 70); // 0 ~ 100, default = 50
-    cap.set(CAP_PROP_CONTRAST, 0);       // -100 ~ 100, default = 0
+    cap.set(CV_CAP_PROP_BRIGHTNESS, 60); // 0 ~ 100, default = 50
+    cap.set(CAP_PROP_CONTRAST, 10);       // -100 ~ 100, default = 0
     cap.set(CV_CAP_PROP_SATURATION, 0);  // -100 ~ 100, default = 0
 
     cap.set(CAP_PROP_AUTO_EXPOSURE, 1); // 0: Auto, 1: Manual
