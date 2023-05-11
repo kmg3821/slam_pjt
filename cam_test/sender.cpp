@@ -15,14 +15,15 @@
 #include <opencv2/highgui.hpp>
 #include <chrono>
 
-
 using namespace std;
 using namespace cv;
 
-int main() {
+int main()
+{
     // create a socket
     int sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock == -1) {
+    if (sock == -1)
+    {
         cerr << "Failed to create socket." << endl;
         return EXIT_FAILURE;
     }
@@ -32,17 +33,19 @@ int main() {
     memset(&server_address, 0, sizeof(server_address));
     server_address.sin_family = AF_INET;
     server_address.sin_port = htons(8080);
-    inet_pton(AF_INET, "192.168.219.159", &server_address.sin_addr);
+    inet_pton(AF_INET, "192.168.110.103", &server_address.sin_addr);
 
     // connect to the server
-    if (connect(sock, (struct sockaddr *)&server_address, sizeof(server_address)) == -1) {
+    if (connect(sock, (struct sockaddr *)&server_address, sizeof(server_address)) == -1)
+    {
         cerr << "Failed to connect to server." << endl;
         return EXIT_FAILURE;
     }
 
     // send the images
     VideoCapture cap("/dev/video0");
-    if (!cap.isOpened()) {
+    if (!cap.isOpened())
+    {
         cerr << "Failed to open video file." << endl;
         return EXIT_FAILURE;
     }
@@ -51,22 +54,23 @@ int main() {
     system("v4l2-ctl -c image_stabilization=1");  // 흔들림 방지
     system("v4l2-ctl -c scene_mode=0");           // 촬영모드, 0: None, 8: Night, 11: Sports
     system("v4l2-ctl -c sharpness=100");          // 예리함 정도
+    system("v4l2-ctl -c rotate=180");             // 회전
     // system("v4l2-ctl -c color_effects=1"); // gray color
 
     cap.set(CV_CAP_PROP_FPS, 25); // default = 20
 
     cap.set(CV_CAP_PROP_BRIGHTNESS, 60); // 0 ~ 100, default = 50
-    cap.set(CAP_PROP_CONTRAST, 10);       // -100 ~ 100, default = 0
+    cap.set(CAP_PROP_CONTRAST, 10);      // -100 ~ 100, default = 0
     cap.set(CV_CAP_PROP_SATURATION, 0);  // -100 ~ 100, default = 0
 
     cap.set(CAP_PROP_AUTO_EXPOSURE, 1); // 0: Auto, 1: Manual
-    cap.set(CAP_PROP_EXPOSURE, 50);     // 1 ~ 10000, default = 1000
+    cap.set(CAP_PROP_EXPOSURE, 30);     // 1 ~ 10000, default = 1000
     cap.set(CV_CAP_PROP_ISO_SPEED, 4);  // 0 ~ 4, default = 0
 
-    for(int i = 0; i < 20; ++i)
+    auto prev = chrono::steady_clock::now();
+    // for(int i = 0; i < 20; ++i)
+    for (;;)
     {
-        auto st = chrono::steady_clock::now();
-
         Mat frame;
         cap.read(frame);
         if (frame.empty())
@@ -78,24 +82,19 @@ int main() {
         vector<uchar> buffer;
         imencode(".jpg", frame, buffer);
         int buffer_size = buffer.size();
-        cout << buffer_size << endl;
-        int bytes_sent = send(sock, &buffer_size, sizeof(buffer_size), 0);
-        if (bytes_sent == -1) {
-            cerr << "Failed to send buffer size." << endl;
-            return EXIT_FAILURE;
-        }
-        bytes_sent = send(sock, buffer.data(), buffer_size, 0);
-        if (bytes_sent == -1) {
+        buffer.insert(buffer.begin(), (uchar *)(&buffer_size), (uchar *)(&buffer_size) + sizeof(int));
+        int bytes_sent = send(sock, buffer.data(), buffer.size(), 0);
+        if (bytes_sent == -1)
+        {
             cerr << "Failed to send image data." << endl;
             return EXIT_FAILURE;
         }
 
-        auto et = chrono::steady_clock::now();
+        auto now = chrono::steady_clock::now();
 
-        auto dt = chrono::duration_cast<chrono::milliseconds>(et - st).count();
+        auto dt = chrono::duration_cast<chrono::milliseconds>(now - prev).count();
         cout << "Elapsed time in milliseconds: " << dt << " ms" << endl;
-
-        usleep(1000 * 1000);
+        prev = now;
     }
 
     // close the socket and video capture

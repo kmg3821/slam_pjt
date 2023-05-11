@@ -9,7 +9,15 @@
                 "-g",
                 "${file}",
                 "-o",
-                "${fileDirname}/${fileBasenameNoExtension}"
+                "${fileDirname}/${fileBasenameNoExtension}",
+                "-L/usr/local/lib",
+                "-L/usr/local/lib64",
+                "-L/lib/x86_64-linux-gnu",
+                "-lopencv_imgproc",
+                "-lopencv_core",
+                "-lopencv_imgcodecs",
+                "-lopencv_videoio",
+                "-lopencv_highgui",
             ],
             "options": {
                 "cwd": "${fileDirname}"
