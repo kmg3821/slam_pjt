@@ -33,7 +33,7 @@ int main()
     memset(&server_address, 0, sizeof(server_address));
     server_address.sin_family = AF_INET;
     server_address.sin_port = htons(8080);
-    inet_pton(AF_INET, "192.168.110.103", &server_address.sin_addr);
+    inet_pton(AF_INET, "192.168.219.161", &server_address.sin_addr);
 
     // connect to the server
     if (connect(sock, (struct sockaddr *)&server_address, sizeof(server_address)) == -1)
@@ -55,7 +55,7 @@ int main()
     system("v4l2-ctl -c scene_mode=0");           // 촬영모드, 0: None, 8: Night, 11: Sports
     system("v4l2-ctl -c sharpness=100");          // 예리함 정도
     system("v4l2-ctl -c rotate=180");             // 회전
-    // system("v4l2-ctl -c color_effects=1"); // gray color
+    system("v4l2-ctl -c color_effects=0"); // gray color
 
     cap.set(CV_CAP_PROP_FPS, 25); // default = 20
 
