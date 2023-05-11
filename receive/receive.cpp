@@ -72,8 +72,9 @@ int main()
     }
 
     // receive images from client
-    //int idx = 0;
+    int idx = 0;
     auto prev = chrono::steady_clock::now();
+    int cnt = 0;
     while (true)
     {
         // receive image size
@@ -104,11 +105,16 @@ int main()
             break;
         }
 
-        //char tmp[30];
-        //sprintf(tmp, "./image%d.jpg", idx++);
-        //imwrite(tmp, image);
+        char tmp[30];
+        if(cnt == 75)
+        {
+            sprintf(tmp, "./image%d.jpg", idx++);
+            imwrite(tmp, image);
+            cnt = 0;
+        }
         imshow("test", image);
         waitKey(1);
+        cnt++;
 
         auto now = chrono::steady_clock::now();
         auto dt = chrono::duration_cast<chrono::milliseconds>(now - prev).count();
