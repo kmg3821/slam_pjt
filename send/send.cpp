@@ -1,5 +1,5 @@
 // compile option
-// g++ -std=c++14 -O2 ./sender.cpp -o ./sender -L/usr/local/include/opencv2/ -lopencv_videoio -lopencv_core -lopencv_imgcodecs
+// g++ -std=c++14 -O2 ./send.cpp -o ./send -L/usr/local/include/opencv2/ -lopencv_videoio -lopencv_core -lopencv_imgcodecs
 
 #include <iostream>
 #include <cstring>

@@ -1,5 +1,5 @@
 // compile option
-// g++ -std=c++14 -O2 ./test.cpp -o ./test -L/usr/local/include/opencv2/ -lopencv_videoio -lopencv_core -lopencv_imgcodecs -lopencv_highgui
+// g++ -std=c++14 -O2 ./receive.cpp -o ./receive -L/usr/local/include/opencv2/ -lopencv_videoio -lopencv_core -lopencv_imgcodecs -lopencv_highgui
 
 #include <iostream>
 #include <sys/socket.h>
