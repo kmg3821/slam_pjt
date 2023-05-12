@@ -7,22 +7,23 @@
 #include <string.h>
 #include <sys/ioctl.h>
 #include <chrono>
-#include<System.h>
+#include <System.h>
 
 #define PORT 8080
+#define VOCA_PATH "/home/kmg/ORB_SLAM3/Vocabulary/ORBvoc.txt"
+#define CAM_INTRINSIC "/home/kmg/slam_pjt/slam/cam_intrinsic.yaml"
 
 using namespace std;
 using namespace cv;
 
 int main()
 {
-    ORB_SLAM3::System SLAM("/home/kmg/ORB_SLAM3/Vocabulary/ORBvoc.txt","/home/kmg/slam_pjt/slam/cam_intrinsic.yaml",ORB_SLAM3::System::MONOCULAR, true);
+    ORB_SLAM3::System SLAM(VOCA_PATH, CAM_INTRINSIC, ORB_SLAM3::System::MONOCULAR, true);
 
     int server_fd, new_socket;
     struct sockaddr_in address;
     int opt = 1;
     int addrlen = sizeof(address);
-    char buffer[1024] = {0};
 
     // create socket file descriptor
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0)
@@ -89,7 +90,7 @@ int main()
             perror("read failed");
             break;
         }
-        cout << tmp.img_size << endl;
+        //cout << tmp.img_size << '\n';
 
         bytes_available = 0;
         while (bytes_available < tmp.img_size)
@@ -110,11 +111,11 @@ int main()
             break;
         }
 
-        const auto t1 = chrono::steady_clock::now();
-        SLAM.TrackMonocular(image,tmp.stamp); // TODO change to monocular_inertial
-        const auto t2 = chrono::steady_clock::now();
-        auto dt= chrono::duration_cast<chrono::milliseconds>(t2 - t1).count();
-        cout << "Elapsed time in milliseconds: " << dt << "ms" << endl;
+        //const auto t1 = chrono::steady_clock::now();
+        SLAM.TrackMonocular(image, tmp.stamp); // TODO change to monocular_inertial
+        //const auto t2 = chrono::steady_clock::now();
+        //auto dt = chrono::duration_cast<chrono::milliseconds>(t2 - t1).count();
+        //cout << "Elapsed time in milliseconds: " << dt << "ms\n";
     }
     SLAM.Shutdown();
 
