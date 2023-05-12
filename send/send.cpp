@@ -15,8 +15,8 @@
 #include <opencv2/highgui.hpp>
 #include <chrono>
 
-//#define IP_ADDRESS "192.168.219.161"
-#define IP_ADDRESS "192.168.110.103"
+#define IP_ADDRESS "192.168.219.161"
+//#define IP_ADDRESS "192.168.110.103"
 #define PORT 8080
 
 using namespace std;
@@ -61,15 +61,15 @@ int main()
     system("v4l2-ctl -c rotate=180");             // 회전
     system("v4l2-ctl -c color_effects=0");        // gray color
 
-    cap.set(CV_CAP_PROP_FPS, 25); // default = 20
+    cap.set(CV_CAP_PROP_FPS, 20); // default = 20
 
-    cap.set(CV_CAP_PROP_BRIGHTNESS, 60); // 0 ~ 100, default = 50
-    cap.set(CAP_PROP_CONTRAST, 10);      // -100 ~ 100, default = 0
+    cap.set(CV_CAP_PROP_BRIGHTNESS, 65); // 0 ~ 100, default = 50
+    cap.set(CAP_PROP_CONTRAST, 100);      // -100 ~ 100, default = 0
     cap.set(CV_CAP_PROP_SATURATION, 0);  // -100 ~ 100, default = 0
 
     cap.set(CAP_PROP_AUTO_EXPOSURE, 1); // 0: Auto, 1: Manual
-    cap.set(CAP_PROP_EXPOSURE, 30);     // 1 ~ 10000, default = 1000
-    cap.set(CV_CAP_PROP_ISO_SPEED, 4);  // 0 ~ 4, default = 0
+    cap.set(CAP_PROP_EXPOSURE, 60);     // 1 ~ 10000, default = 1000
+    cap.set(CV_CAP_PROP_ISO_SPEED, 1);  // 0 ~ 4, default = 0
 
     const auto t0 = chrono::high_resolution_clock::now();
     // for(int i = 0; i < 20; ++i)
@@ -79,7 +79,7 @@ int main()
         cap.read(frame);
         const auto t = chrono::high_resolution_clock::now();
         const auto tframe = chrono::duration_cast<chrono::milliseconds>(t - t0).count();
-        cout << "Elapsed time in milliseconds: " << tframe << " ms" << endl;
+        cout << tframe << " ms\n";
         if (frame.empty())
         {
             cerr << "ERROR! blank frame grabbed\n";
