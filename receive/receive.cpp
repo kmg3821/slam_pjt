@@ -38,7 +38,7 @@ int main()
     }
 
     // set socket receive buffer
-    int buf_size = 60000 * 1000;
+    int buf_size = 200000 * 1000;
     if (setsockopt(server_fd, SOL_SOCKET, SO_RCVBUF, &buf_size, sizeof(buf_size)))
     {
         perror("setsockopt failed");
@@ -77,37 +77,29 @@ int main()
     auto prev = chrono::steady_clock::now();
     while (true)
     {
+        struct HEADER
+        {
+            int img_size;
+            uint64_t stamp;
+        } tmp;
+
         int bytes_available = 0;
-
-        // receive image size
-        int img_size = 0;
-        while (bytes_available < sizeof(img_size))
+        while (bytes_available < sizeof(tmp))
             ioctl(new_socket, FIONREAD, &bytes_available);
 
-        if (read(new_socket, &img_size, sizeof(img_size)) <= 0)
+        if (read(new_socket, &tmp, sizeof(tmp)) <= 0)
         {
             perror("read failed");
             break;
         }
-        cout << img_size << endl;
-
-        uint64_t stamp = 0;
-        bytes_available = 0;
-        while (bytes_available < sizeof(stamp))
-            ioctl(new_socket, FIONREAD, &bytes_available);
-            
-        if (read(new_socket, &stamp, sizeof(stamp)) <= 0)
-        {
-            perror("read failed");
-            break;
-        }
+        cout << tmp.img_size << endl;
 
         bytes_available = 0;
-        while (bytes_available < img_size)
+        while (bytes_available < tmp.img_size)
             ioctl(new_socket, FIONREAD, &bytes_available);
 
-        vector<uchar> data(img_size);
-        if (read(new_socket, data.data(), img_size) <= 0)
+        vector<uchar> data(tmp.img_size);
+        if (read(new_socket, data.data(), tmp.img_size) <= 0)
         {
             perror("read failed");
             break;
