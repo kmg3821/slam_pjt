@@ -1,5 +1,3 @@
-// compile option
-// g++ -std=c++14 -O2 ./receive.cpp -o ./receive -L/usr/local/include/opencv2/ -lopencv_videoio -lopencv_core -lopencv_imgcodecs -lopencv_highgui
 
 #include <iostream>
 #include <sys/socket.h>
@@ -9,6 +7,7 @@
 #include <string.h>
 #include <sys/ioctl.h>
 #include <chrono>
+#include<System.h>
 
 #define PORT 8080
 
@@ -17,6 +16,8 @@ using namespace cv;
 
 int main()
 {
+    ORB_SLAM3::System SLAM("/home/kmg/ORB_SLAM3/Vocabulary/ORBvoc.txt","/home/kmg/slam_pjt/slam/cam_intrinsic.yaml",ORB_SLAM3::System::MONOCULAR, true);
+
     int server_fd, new_socket;
     struct sockaddr_in address;
     int opt = 1;
@@ -71,10 +72,6 @@ int main()
         return EXIT_FAILURE;
     }
 
-    // receive images from client
-    //int idx = 0;
-    //int cnt = 0;
-    auto prev = chrono::steady_clock::now();
     while (true)
     {
         struct HEADER
@@ -113,22 +110,13 @@ int main()
             break;
         }
 
-        // char tmp[30];
-        // if(cnt == 75)
-        // {
-        //     sprintf(tmp, "./image%d.jpg", idx++);
-        //     imwrite(tmp, image);
-        //     cnt = 0;
-        // }
-        // cnt++;
-        imshow("test", image);
-        waitKey(1);
-
-        auto now = chrono::steady_clock::now();
-        auto dt = chrono::duration_cast<chrono::milliseconds>(now - prev).count();
+        const auto t1 = chrono::steady_clock::now();
+        SLAM.TrackMonocular(image,tmp.stamp); // TODO change to monocular_inertial
+        const auto t2 = chrono::steady_clock::now();
+        auto dt= chrono::duration_cast<chrono::milliseconds>(t2 - t1).count();
         cout << "Elapsed time in milliseconds: " << dt << "ms" << endl;
-        prev = now;
     }
+    SLAM.Shutdown();
 
     // close sockets
     close(new_socket);
