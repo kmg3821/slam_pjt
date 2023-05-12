@@ -77,16 +77,32 @@ int main()
     auto prev = chrono::steady_clock::now();
     while (true)
     {
+        int bytes_available = 0;
+
         // receive image size
         int img_size = 0;
-        if (read(new_socket, &img_size, sizeof(int)) <= 0)
+        while (bytes_available < sizeof(img_size))
+            ioctl(new_socket, FIONREAD, &bytes_available);
+
+        if (read(new_socket, &img_size, sizeof(img_size)) <= 0)
         {
             perror("read failed");
             break;
         }
         cout << img_size << endl;
 
-        int bytes_available = 0;
+        uint64_t stamp = 0;
+        bytes_available = 0;
+        while (bytes_available < sizeof(stamp))
+            ioctl(new_socket, FIONREAD, &bytes_available);
+            
+        if (read(new_socket, &stamp, sizeof(stamp)) <= 0)
+        {
+            perror("read failed");
+            break;
+        }
+
+        bytes_available = 0;
         while (bytes_available < img_size)
             ioctl(new_socket, FIONREAD, &bytes_available);
 

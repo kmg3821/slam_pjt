@@ -55,7 +55,7 @@ int main()
     system("v4l2-ctl -c scene_mode=0");           // 촬영모드, 0: None, 8: Night, 11: Sports
     system("v4l2-ctl -c sharpness=100");          // 예리함 정도
     system("v4l2-ctl -c rotate=180");             // 회전
-    system("v4l2-ctl -c color_effects=0"); // gray color
+    system("v4l2-ctl -c color_effects=0");        // gray color
 
     cap.set(CV_CAP_PROP_FPS, 25); // default = 20
 
@@ -67,12 +67,14 @@ int main()
     cap.set(CAP_PROP_EXPOSURE, 30);     // 1 ~ 10000, default = 1000
     cap.set(CV_CAP_PROP_ISO_SPEED, 4);  // 0 ~ 4, default = 0
 
-    auto prev = chrono::steady_clock::now();
+    const auto t0 = chrono::high_resolution_clock::now();
     // for(int i = 0; i < 20; ++i)
     for (;;)
     {
         Mat frame;
         cap.read(frame);
+        const auto t = chrono::high_resolution_clock::now();
+        const auto tframe = chrono::duration_cast<chrono::milliseconds>(t - t0).count();
         if (frame.empty())
         {
             cerr << "ERROR! blank frame grabbed\n";
@@ -80,21 +82,19 @@ int main()
         }
 
         vector<uchar> buffer;
+        buffer.reserve(100000);
         imencode(".jpg", frame, buffer);
-        int buffer_size = buffer.size();
-        buffer.insert(buffer.begin(), (uchar *)(&buffer_size), (uchar *)(&buffer_size) + sizeof(int));
-        int bytes_sent = send(sock, buffer.data(), buffer.size(), 0);
+        buffer.insert(buffer.begin(), (uchar *)(&tframe), (uchar *)(&tframe) + sizeof(tframe));
+        const int bufsz = buffer.size();
+        buffer.insert(buffer.begin(), (uchar *)(&bufsz), (uchar *)(&bufsz) + sizeof(bufsz));
+        const int bytes_sent = send(sock, buffer.data(), buffer.size(), 0);
         if (bytes_sent == -1)
         {
             cerr << "Failed to send image data." << endl;
             return EXIT_FAILURE;
         }
 
-        auto now = chrono::steady_clock::now();
-
-        auto dt = chrono::duration_cast<chrono::milliseconds>(now - prev).count();
-        cout << "Elapsed time in milliseconds: " << dt << " ms" << endl;
-        prev = now;
+        cout << "Elapsed time in milliseconds: " << tframe << " ms" << endl;
     }
 
     // close the socket and video capture
