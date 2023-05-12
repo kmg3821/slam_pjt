@@ -15,6 +15,10 @@
 #include <opencv2/highgui.hpp>
 #include <chrono>
 
+//#define IP_ADDRESS "192.168.219.161"
+#define IP_ADDRESS "192.168.110.103"
+#define PORT 8080
+
 using namespace std;
 using namespace cv;
 
@@ -32,8 +36,8 @@ int main()
     struct sockaddr_in server_address;
     memset(&server_address, 0, sizeof(server_address));
     server_address.sin_family = AF_INET;
-    server_address.sin_port = htons(8080);
-    inet_pton(AF_INET, "192.168.219.161", &server_address.sin_addr);
+    server_address.sin_port = htons(PORT);
+    inet_pton(AF_INET, IP_ADDRESS, &server_address.sin_addr);
 
     // connect to the server
     if (connect(sock, (struct sockaddr *)&server_address, sizeof(server_address)) == -1)
@@ -75,6 +79,7 @@ int main()
         cap.read(frame);
         const auto t = chrono::high_resolution_clock::now();
         const auto tframe = chrono::duration_cast<chrono::milliseconds>(t - t0).count();
+        cout << "Elapsed time in milliseconds: " << tframe << " ms" << endl;
         if (frame.empty())
         {
             cerr << "ERROR! blank frame grabbed\n";
@@ -82,19 +87,22 @@ int main()
         }
 
         vector<uchar> buffer;
-        buffer.reserve(100000);
+        buffer.reserve(200000);
         imencode(".jpg", frame, buffer);
-        buffer.insert(buffer.begin(), (uchar *)(&tframe), (uchar *)(&tframe) + sizeof(tframe));
-        const int bufsz = buffer.size();
-        buffer.insert(buffer.begin(), (uchar *)(&bufsz), (uchar *)(&bufsz) + sizeof(bufsz));
+        struct HEADER
+        {
+            int bufsz;
+            uint64_t stamp;
+        } tmp;
+        tmp.bufsz = buffer.size();
+        tmp.stamp = tframe;
+        buffer.insert(buffer.begin(), (uchar *)(&tmp), (uchar *)(&tmp) + sizeof(tmp));
         const int bytes_sent = send(sock, buffer.data(), buffer.size(), 0);
         if (bytes_sent == -1)
         {
             cerr << "Failed to send image data." << endl;
             return EXIT_FAILURE;
         }
-
-        cout << "Elapsed time in milliseconds: " << tframe << " ms" << endl;
     }
 
     // close the socket and video capture
