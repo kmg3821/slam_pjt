@@ -1,6 +1,5 @@
 # slam_pjt
-orb slam is running on a remote computer
-
+orb slam runs on a remote computer
 ![slam1](https://github.com/kmg3821/slam_pjt/assets/52714442/11163599-bf98-4230-818c-cd516e0a470f)
 
 raspberry pi 4B + raspberry pi camera v1.3
