@@ -72,8 +72,8 @@ int main()
     }
 
     // receive images from client
-    //int idx = 0;
-    //int cnt = 0;
+    int idx = 0;
+    int cnt = 0;
     auto prev = chrono::steady_clock::now();
     while (true)
     {
@@ -92,7 +92,7 @@ int main()
             perror("read failed");
             break;
         }
-        cout << tmp.img_size << endl;
+        //cout << tmp.img_size << endl;
 
         bytes_available = 0;
         while (bytes_available < tmp.img_size)
@@ -113,21 +113,23 @@ int main()
             break;
         }
 
-        // char tmp[30];
-        // if(cnt == 75)
-        // {
-        //     sprintf(tmp, "./image%d.jpg", idx++);
-        //     imwrite(tmp, image);
-        //     cnt = 0;
-        // }
-        // cnt++;
+        char str[30];
+        if(cnt == 75)
+        {
+            sprintf(str, "./image%d.jpg", idx++);
+            imwrite(str, image);
+            cnt = 0;
+            cout << idx << '\n';
+        }
+        if(idx == 30) break;
+        cnt++;
         imshow("test", image);
         waitKey(1);
 
-        auto now = chrono::steady_clock::now();
-        auto dt = chrono::duration_cast<chrono::milliseconds>(now - prev).count();
-        cout << "Elapsed time in milliseconds: " << dt << "ms" << endl;
-        prev = now;
+        //auto now = chrono::steady_clock::now();
+        //auto dt = chrono::duration_cast<chrono::milliseconds>(now - prev).count();
+        //cout << "Elapsed time in milliseconds: " << dt << "ms" << endl;
+        //prev = now;
     }
 
     // close sockets
