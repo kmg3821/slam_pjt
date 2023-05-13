@@ -16,7 +16,7 @@
 #include <chrono>
 
 #define IP_ADDRESS "192.168.219.161"
-//#define IP_ADDRESS "192.168.110.103"
+// #define IP_ADDRESS "192.168.110.103"
 #define PORT 8080
 
 using namespace std;
@@ -54,22 +54,21 @@ int main()
         return EXIT_FAILURE;
     }
 
-    system("v4l2-ctl -c iso_sensitivity_auto=0"); // manual mode
+    system("v4l2-ctl -c brightness=60");   // 0 ~ 100, default = 50
+    system("v4l2-ctl -c contrast=100");    // -100 ~ 100, default = 0
+    system("v4l2-ctl -c saturation=100");  // -100 ~ 100, default = 0
+    system("v4l2-ctl -c sharpness=100");   // 예리함 정도
+    system("v4l2-ctl -c rotate=180");      // 회전
+
+    system("v4l2-ctl -c auto_exposure=0");           // 0:auto, 1:manual
+    system("v4l2-ctl -c exposure_time_absolute=50"); // 1 ~ 10000, default = 1000
+    system("v4l2-ctl -c auto_exposure_bias=0");      // 노출 기준값
+
     system("v4l2-ctl -c image_stabilization=1");  // 흔들림 방지
-    system("v4l2-ctl -c scene_mode=0");           // 촬영모드, 0: None, 8: Night, 11: Sports
-    system("v4l2-ctl -c sharpness=100");          // 예리함 정도
-    system("v4l2-ctl -c rotate=180");             // 회전
-    system("v4l2-ctl -c color_effects=0");        // gray color
+    system("v4l2-ctl -c iso_sensitivity=4");      // 0 ~ 4, default = 0
+    system("v4l2-ctl -c iso_sensitivity_auto=1"); // 0:manual, 1:auto
 
-    cap.set(CV_CAP_PROP_FPS, 20); // default = 20
-
-    cap.set(CV_CAP_PROP_BRIGHTNESS, 65); // 0 ~ 100, default = 50
-    cap.set(CAP_PROP_CONTRAST, 100);      // -100 ~ 100, default = 0
-    cap.set(CV_CAP_PROP_SATURATION, 0);  // -100 ~ 100, default = 0
-
-    cap.set(CAP_PROP_AUTO_EXPOSURE, 1); // 0: Auto, 1: Manual
-    cap.set(CAP_PROP_EXPOSURE, 60);     // 1 ~ 10000, default = 1000
-    cap.set(CV_CAP_PROP_ISO_SPEED, 1);  // 0 ~ 4, default = 0
+    cap.set(CV_CAP_PROP_FPS, 20);
 
     const auto t0 = chrono::high_resolution_clock::now();
     // for(int i = 0; i < 20; ++i)
