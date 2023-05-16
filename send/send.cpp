@@ -15,9 +15,17 @@
 #include <opencv2/highgui.hpp>
 #include <chrono>
 
+#include <fcntl.h>
+#include <sys/ioctl.h>
+#include <linux/i2c-dev.h>
+
 #define IP_ADDRESS "192.168.219.161"
 // #define IP_ADDRESS "192.168.110.103"
 #define PORT 8080
+
+#define ACCEL_XOUT_H 0x3B
+#define PWR_MGMT 0x6B
+#define CONFIG 0x1A
 
 using namespace std;
 using namespace cv;
@@ -54,11 +62,11 @@ int main()
         return EXIT_FAILURE;
     }
 
-    system("v4l2-ctl -c brightness=85");  // 0 ~ 100, default = 50
+    system("v4l2-ctl -c brightness=85"); // 0 ~ 100, default = 50
     system("v4l2-ctl -c contrast=80");   // -100 ~ 100, default = 0
     system("v4l2-ctl -c saturation=80"); // -100 ~ 100, default = 0
-    system("v4l2-ctl -c sharpness=100");  // 예리함 정도
-    system("v4l2-ctl -c rotate=180");     // 회전
+    system("v4l2-ctl -c sharpness=100"); // 예리함 정도
+    system("v4l2-ctl -c rotate=180");    // 회전
 
     system("v4l2-ctl -c auto_exposure=0");           // 0:auto, 1:manual
     system("v4l2-ctl -c exposure_time_absolute=30"); // 1 ~ 10000, default = 1000
@@ -70,6 +78,44 @@ int main()
     system("v4l2-ctl -c exposure_metering_mode=0"); // 0:average, 1:center, 2:spot, 3:matrix
 
     system("v4l2-ctl -p 20"); // fps
+
+    /////////////////////////////////////////////////////////////////////
+    // Open the I2C bus.
+    int file_i2c = open("/dev/i2c-1", O_RDWR);
+    if (file_i2c < 0)
+    {
+        cerr << "Failed to open the i2c bus" << endl;
+        return 1;
+    }
+
+    // Set the I2C address of the slave device.
+    int addr = 0x68;
+    if (ioctl(file_i2c, I2C_SLAVE, addr) < 0)
+    {
+        cerr << "Failed to acquire bus access and/or talk to slave." << endl;
+        return 1;
+    }
+
+    // Set to use the internal oscillator
+    {
+        uint8_t buf[2] = {PWR_MGMT, 0x00}; // {address, value}
+        if (write(file_i2c, buf, 2) != 2)
+        {
+            cerr << "Failed to write to the i2c bus." << endl;
+            return 1;
+        }
+    }
+
+    // Set to use the lowpass filter
+    {
+        uint8_t buf[2] = {CONFIG, 0x01}; // {address, value}
+        if (write(file_i2c, buf, 2) != 2)
+        {
+            cerr << "Failed to write to the i2c bus." << endl;
+            return 1;
+        }
+    }
+    /////////////////////////////////////////////////////////////////////
 
     const auto t0 = chrono::high_resolution_clock::now();
     // for(int i = 0; i < 20; ++i)

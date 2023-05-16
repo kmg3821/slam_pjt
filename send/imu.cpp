@@ -7,9 +7,15 @@
 #include <sys/ioctl.h>
 #include <linux/i2c-dev.h>
 #include <chrono>
+#include <string.h>
 
 #define ACCEL_XOUT_H 0x3B
 #define PWR_MGMT 0x6B
+#define CONFIG 0x1A
+#define SMPRT_DIV 0x19
+#define FIFO_EN 0x23
+#define USER_CTRL 0x6A
+#define FIFO_R_W 0x74
 
 using namespace std;
 
@@ -32,14 +38,58 @@ int main()
   }
 
   // Set to use the internal oscillator
-  uint8_t buf[2] = {PWR_MGMT, 0x00}; // {address, value}
-  if (write(file_i2c, buf, 2) != 2)
   {
-    cerr << "Failed to write to the i2c bus." << endl;
-    return 1;
+    uint8_t buf[2] = {PWR_MGMT, 0x00}; // {address, value}
+    if (write(file_i2c, buf, 2) != 2)
+    {
+      cerr << "Failed to write to the i2c bus." << endl;
+      return 1;
+    }
   }
 
-  for (int i = 0; ; ++i)
+  // Set to use the lowpass filter
+  {
+    uint8_t buf[2] = {CONFIG, 0x01}; // {address, value}
+    if (write(file_i2c, buf, 2) != 2)
+    {
+      cerr << "Failed to write to the i2c bus." << endl;
+      return 1;
+    }
+  }
+
+  // Set sampling rate to 200Hz
+  {
+    uint8_t buf[2] = {SMPRT_DIV, 0x04}; // {address, value}
+    if (write(file_i2c, buf, 2) != 2)
+    {
+      cerr << "Failed to write to the i2c bus." << endl;
+      return 1;
+    }
+  }
+
+  // Set to enable FIFO
+  {
+    uint8_t buf[2] = {USER_CTRL, 0x44}; // {address, value}
+    if (write(file_i2c, buf, 2) != 2)
+    {
+      cerr << "Failed to write to the i2c bus." << endl;
+      return 1;
+    }
+  }
+
+  // Set to use FIFO buffer
+  {
+    uint8_t buf[2] = {FIFO_EN, 0x78}; // {address, value}
+    if (write(file_i2c, buf, 2) != 2)
+    {
+      cerr << "Failed to write to the i2c bus." << endl;
+      return 1;
+    }
+  }
+
+  FILE *fs = fopen("imu_data.txt", "w");
+  auto t0 = chrono::high_resolution_clock::now();
+  for (int i = 0; i < 1000; ++i)
   {
     // Write a byte to the slave device.
     unsigned char data = ACCEL_XOUT_H;
@@ -57,26 +107,32 @@ int main()
       return 1;
     }
 
-    auto stamp = chrono::high_resolution_clock::now().time_since_epoch().count();
+    auto t = chrono::high_resolution_clock::now();
+    int dt = chrono::duration_cast<chrono::milliseconds>(t - t0).count();
 
-    volatile short ax = (read_data[0] << 8) | read_data[1];
-    volatile short ay = (read_data[2] << 8) | read_data[3];
-    volatile short az = (read_data[4] << 8) | read_data[5];
+    short ax = (read_data[0] << 8) | read_data[1];
+    short ay = (read_data[2] << 8) | read_data[3];
+    short az = (read_data[4] << 8) | read_data[5];
 
-    volatile short wx = (read_data[8] << 8) | read_data[9];
-    volatile short wy = (read_data[10] << 8) | read_data[11];
-    volatile short wz = (read_data[12] << 8) | read_data[13];
+    short wx = (read_data[8] << 8) | read_data[9];
+    short wy = (read_data[10] << 8) | read_data[11];
+    short wz = (read_data[12] << 8) | read_data[13];
 
+    // char str[512] = {0};
+    // sprintf(str, "%d,%d,%d,%d,%d,%d,%d\n", dt, ax, ay, az, wx, wy, wz);
+    // cout << str << endl;
+    //fprintf(fs, "%d,%d,%d,%d,%d,%d,%d\n", dt, ax, ay, az, wx, wy, wz);
 
     // Print the data that was read.
-    cout << stamp << '(' << ax << ',' << ay << ',' << az << ')'
-      << '(' << wx << ',' << wy << ',' << wz << ")\n";
+    cout << dt << '(' << ax << ',' << ay << ',' << az << ')'
+        << '(' << wx << ',' << wy << ',' << wz << ")\n";
 
     usleep(10 * 1000);
   }
 
   // Close the I2C bus.
   close(file_i2c);
+  fclose(fs);
 
   return 0;
 }
