@@ -77,6 +77,7 @@ int main()
     {
         struct HEADER
         {
+            int imu_size;
             int img_size;
             uint64_t stamp;
         } tmp;
@@ -91,6 +92,16 @@ int main()
             break;
         }
         //cout << tmp.img_size << '\n';
+
+        bytes_available = 0;
+        unsigned char read_data[12 * 1000];
+        while (bytes_available < tmp.imu_size)
+            ioctl(new_socket, FIONREAD, &bytes_available);
+        if (read(new_socket, &read_data, tmp.imu_size) <= 0)
+        {
+            perror("read failed");
+            break;
+        }
 
         bytes_available = 0;
         while (bytes_available < tmp.img_size)

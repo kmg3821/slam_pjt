@@ -79,6 +79,7 @@ int main()
     {
         struct HEADER
         {
+            int imu_size;
             int img_size;
             uint64_t stamp;
         } tmp;
@@ -92,7 +93,17 @@ int main()
             perror("read failed");
             break;
         }
-        //cout << tmp.img_size << endl;
+        // cout << tmp.img_size << endl;
+
+        bytes_available = 0;
+        unsigned char read_data[12 * 1000];
+        while (bytes_available < tmp.imu_size)
+            ioctl(new_socket, FIONREAD, &bytes_available);
+        if (read(new_socket, &read_data, tmp.imu_size) <= 0)
+        {
+            perror("read failed");
+            break;
+        }
 
         bytes_available = 0;
         while (bytes_available < tmp.img_size)
@@ -113,23 +124,33 @@ int main()
             break;
         }
 
-        char str[30];
-        if(cnt == 75)
-        {
-            sprintf(str, "./image%d.jpg", idx++);
-            imwrite(str, image);
-            cnt = 0;
-            cout << idx << '\n';
-        }
-        if(idx == 30) break;
-        cnt++;
+        // char str[30];
+        // if(cnt == 75)
+        // {
+        //     sprintf(str, "./image%d.jpg", idx++);
+        //     imwrite(str, image);
+        //     cnt = 0;
+        //     cout << idx << '\n';
+        // }
+        // if(idx == 30) break;
+        // cnt++;
         imshow("test", image);
         waitKey(1);
 
-        //auto now = chrono::steady_clock::now();
-        //auto dt = chrono::duration_cast<chrono::milliseconds>(now - prev).count();
-        //cout << "Elapsed time in milliseconds: " << dt << "ms" << endl;
-        //prev = now;
+        for (int i = 0; i < tmp.imu_size / 12; ++i)
+        {
+            short ax = (read_data[12 * i + 0] << 8) | read_data[12 * i + 1];
+            short ay = (read_data[12 * i + 2] << 8) | read_data[12 * i + 3];
+            short az = (read_data[12 * i + 4] << 8) | read_data[12 * i + 5];
+
+            short wx = (read_data[12 * i + 6] << 8) | read_data[12 * i + 7];
+            short wy = (read_data[12 * i + 8] << 8) | read_data[12 * i + 9];
+            short wz = (read_data[12 * i + 10] << 8) | read_data[12 * i + 11];
+
+            cout << '(' << ax << ',' << ay << ',' << az << ')'
+                 << '(' << wx << ',' << wy << ',' << wz << ")\n";
+        }
+        cout << "-------------------------------------------------------\n";
     }
 
     // close sockets
