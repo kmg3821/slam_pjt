@@ -35,6 +35,50 @@
 using namespace std;
 using namespace cv;
 
+
+#define DEG2RAD 3.141592 / 180.f
+
+using namespace std;
+
+// // Open the I2C bus.
+// int file_i2c = open("/dev/i2c-1", O_RDWR);
+
+// inline void get_inertia(uint64_t &t, float a[3], float w[3])
+// {
+//   // Write a byte to the slave device.
+//   unsigned char data = ACCEL_XOUT_H;
+//   if (write(file_i2c, &data, 1) != 1)
+//   {
+//     cerr << "Failed to write to the i2c bus." << endl;
+//     exit(1);
+//   }
+
+//   // Read a byte from the slave device.
+//   unsigned char read_data[14] = {0};
+//   if (read(file_i2c, read_data, 14) != 14)
+//   {
+//     cerr << "Failed to read from the i2c bus." << endl;
+//     exit(1);
+//   }
+//   t = chrono::high_resolution_clock::now().time_since_epoch().count();
+
+//   short ax = (read_data[0] << 8) | read_data[1];
+//   short ay = (read_data[2] << 8) | read_data[3];
+//   short az = (read_data[4] << 8) | read_data[5];
+
+//   short wx = (read_data[8] << 8) | read_data[9];
+//   short wy = (read_data[10] << 8) | read_data[11];
+//   short wz = (read_data[12] << 8) | read_data[13];
+
+//   w[0] = (float)wx * DEG2RAD / 131.f;
+//   w[1] = (float)wy * DEG2RAD / 131.f;
+//   w[2] = (float)wz * DEG2RAD / 131.f;
+
+//   a[0] = (float)ax * 9.81 / 16384.f;
+//   a[1] = (float)ay * 9.81 / 16384.f;
+//   a[2] = (float)az * 9.81 / 16384.f;
+// }
+
 int main()
 {
     // create a socket
