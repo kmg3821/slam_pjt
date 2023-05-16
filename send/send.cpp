@@ -20,7 +20,8 @@
 #include <linux/i2c-dev.h>
 
 //#define IP_ADDRESS "192.168.219.161"
-#define IP_ADDRESS "192.168.26.33"
+//#define IP_ADDRESS "192.168.26.33"
+#define IP_ADDRESS "192.168.110.103"
 #define PORT 8080
 
 #define ACCEL_XOUT_H 0x3B
