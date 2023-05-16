@@ -19,13 +19,18 @@
 #include <sys/ioctl.h>
 #include <linux/i2c-dev.h>
 
-#define IP_ADDRESS "192.168.219.161"
-// #define IP_ADDRESS "192.168.110.103"
+//#define IP_ADDRESS "192.168.219.161"
+#define IP_ADDRESS "192.168.26.33"
 #define PORT 8080
 
 #define ACCEL_XOUT_H 0x3B
 #define PWR_MGMT 0x6B
 #define CONFIG 0x1A
+#define SMPRT_DIV 0x19
+#define FIFO_EN 0x23
+#define USER_CTRL 0x6A
+#define FIFO_R_W 0x74
+#define FIFO_COUNT_H 0x72
 
 using namespace std;
 using namespace cv;
@@ -115,6 +120,36 @@ int main()
             return 1;
         }
     }
+
+    // Set sampling rate to 200Hz
+    {
+        uint8_t buf[2] = {SMPRT_DIV, 0x04}; // {address, value}
+        if (write(file_i2c, buf, 2) != 2)
+        {
+            cerr << "Failed to write to the i2c bus." << endl;
+            return 1;
+        }
+    }
+
+    // Set to enable FIFO
+    {
+        uint8_t buf[2] = {USER_CTRL, 0x44}; // {address, value}
+        if (write(file_i2c, buf, 2) != 2)
+        {
+            cerr << "Failed to write to the i2c bus." << endl;
+            return 1;
+        }
+    }
+
+    // Set to use FIFO buffer
+    {
+        uint8_t buf[2] = {FIFO_EN, 0x78}; // {address, value}
+        if (write(file_i2c, buf, 2) != 2)
+        {
+            cerr << "Failed to write to the i2c bus." << endl;
+            return 1;
+        }
+    }
     /////////////////////////////////////////////////////////////////////
 
     const auto t0 = chrono::high_resolution_clock::now();
@@ -124,8 +159,54 @@ int main()
         Mat frame;
         cap.read(frame);
         const auto t = chrono::high_resolution_clock::now();
+
+        struct HEADER
+        {
+            int imusz;
+            int bufsz;
+            uint64_t stamp;
+            unsigned char imu[12 * 1000];
+        } tmp;
+
+        ///////////////
+        // Write a byte to the slave device.
+        {
+            unsigned char data = FIFO_COUNT_H;
+            if (write(file_i2c, &data, 1) != 1)
+            {
+                cerr << "Failed to write to the i2c bus." << endl;
+                return 1;
+            }
+
+            // Read a byte from the slave device.
+            unsigned char buf[2] = {0};
+            if (read(file_i2c, buf, 2) != 2)
+            {
+                cerr << "Failed to read from the i2c bus." << endl;
+                return 1;
+            }
+            tmp.imusz = (buf[0] << 8) | buf[1];
+        }
+        // Write a byte to the slave device.
+        {
+            unsigned char data = FIFO_R_W;
+            if (write(file_i2c, &data, 1) != 1)
+            {
+                cerr << "Failed to write to the i2c bus." << endl;
+                return 1;
+            }
+
+            // Read a byte from the slave device.
+            if (read(file_i2c, tmp.imu, tmp.imusz) != tmp.imusz)
+            {
+                cerr << "Failed to read from the i2c bus." << endl;
+                return 1;
+            }
+        }
+        //////////////
+
         const auto tframe = chrono::duration_cast<chrono::milliseconds>(t - t0).count();
-        cout << tframe << " ms\n";
+        //cout << tframe << " ms\n";
         if (frame.empty())
         {
             cerr << "ERROR! blank frame grabbed\n";
@@ -135,20 +216,16 @@ int main()
         vector<uchar> buffer;
         buffer.reserve(200000);
         imencode(".jpg", frame, buffer);
-        struct HEADER
-        {
-            int bufsz;
-            uint64_t stamp;
-        } tmp;
         tmp.bufsz = buffer.size();
         tmp.stamp = tframe;
-        buffer.insert(buffer.begin(), (uchar *)(&tmp), (uchar *)(&tmp) + sizeof(tmp));
+        buffer.insert(buffer.begin(), (uchar *)(&tmp), (uchar *)(&tmp) + sizeof(tmp.imusz) + sizeof(tmp.bufsz) + sizeof(tmp.stamp) + tmp.imusz);
         const int bytes_sent = send(sock, buffer.data(), buffer.size(), 0);
         if (bytes_sent == -1)
         {
             cerr << "Failed to send image data." << endl;
             return EXIT_FAILURE;
         }
+        cout << tmp.imusz << '\n';
     }
 
     // close the socket and video capture

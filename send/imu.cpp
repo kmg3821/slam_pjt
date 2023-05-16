@@ -16,6 +16,7 @@
 #define FIFO_EN 0x23
 #define USER_CTRL 0x6A
 #define FIFO_R_W 0x74
+#define FIFO_COUNT_H 0x72
 
 using namespace std;
 
@@ -92,7 +93,7 @@ int main()
   for (int i = 0; i < 1000; ++i)
   {
     // Write a byte to the slave device.
-    unsigned char data = ACCEL_XOUT_H;
+    unsigned char data = FIFO_COUNT_H;
     if (write(file_i2c, &data, 1) != 1)
     {
       cerr << "Failed to write to the i2c bus." << endl;
@@ -100,8 +101,25 @@ int main()
     }
 
     // Read a byte from the slave device.
-    unsigned char read_data[16] = {0};
-    if (read(file_i2c, read_data, 14) != 14)
+    unsigned char buf[2] = {0};
+    if (read(file_i2c, buf, 2) != 2)
+    {
+      cerr << "Failed to read from the i2c bus." << endl;
+      return 1;
+    }
+    short len = (buf[0] << 8) | buf[1];
+
+    // Write a byte to the slave device.
+    data = FIFO_R_W;
+    if (write(file_i2c, &data, 1) != 1)
+    {
+      cerr << "Failed to write to the i2c bus." << endl;
+      return 1;
+    }
+
+    // Read a byte from the slave device.
+    unsigned char read_data[12 * 1000] = {0};
+    if (read(file_i2c, read_data, len) != len)
     {
       cerr << "Failed to read from the i2c bus." << endl;
       return 1;
@@ -110,24 +128,29 @@ int main()
     auto t = chrono::high_resolution_clock::now();
     int dt = chrono::duration_cast<chrono::milliseconds>(t - t0).count();
 
-    short ax = (read_data[0] << 8) | read_data[1];
-    short ay = (read_data[2] << 8) | read_data[3];
-    short az = (read_data[4] << 8) | read_data[5];
+    cout << "len: " << len << '\n';
+    for (int i = 0; i < len / 12; ++i)
+    {
+      short ax = (read_data[12 * i + 0] << 8) | read_data[12 * i + 1];
+      short ay = (read_data[12 * i + 2] << 8) | read_data[12 * i + 3];
+      short az = (read_data[12 * i + 4] << 8) | read_data[12 * i + 5];
 
-    short wx = (read_data[8] << 8) | read_data[9];
-    short wy = (read_data[10] << 8) | read_data[11];
-    short wz = (read_data[12] << 8) | read_data[13];
+      short wx = (read_data[12 * i + 6] << 8) | read_data[12 * i + 7];
+      short wy = (read_data[12 * i + 8] << 8) | read_data[12 * i + 9];
+      short wz = (read_data[12 * i + 10] << 8) | read_data[12 * i + 11];
 
-    // char str[512] = {0};
-    // sprintf(str, "%d,%d,%d,%d,%d,%d,%d\n", dt, ax, ay, az, wx, wy, wz);
-    // cout << str << endl;
-    //fprintf(fs, "%d,%d,%d,%d,%d,%d,%d\n", dt, ax, ay, az, wx, wy, wz);
+      // char str[512] = {0};
+      // sprintf(str, "%d,%d,%d,%d,%d,%d,%d\n", dt, ax, ay, az, wx, wy, wz);
+      // cout << str << endl;
+      // fprintf(fs, "%d,%d,%d,%d,%d,%d,%d\n", dt, ax, ay, az, wx, wy, wz);
 
-    // Print the data that was read.
-    cout << dt << '(' << ax << ',' << ay << ',' << az << ')'
-        << '(' << wx << ',' << wy << ',' << wz << ")\n";
+      // Print the data that was read.
+      cout << dt << '(' << ax << ',' << ay << ',' << az << ')'
+           << '(' << wx << ',' << wy << ',' << wz << ")\n";
+    }
+    cout << "-----------------------------------------------------\n";
 
-    usleep(10 * 1000);
+    usleep(100 * 1000);
   }
 
   // Close the I2C bus.
