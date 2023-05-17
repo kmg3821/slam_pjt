@@ -4,6 +4,8 @@
             "name": "Linux",
             "includePath": [
                 "${workspaceFolder}/**",
+                "/home/kmg/ORB_SLAM3/include/**",
+                "/home/kmg/ORB_SLAM3/Thirdparty/DBoW2/**"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/gcc",
