@@ -8,6 +8,7 @@
 #include <sys/ioctl.h>
 #include <chrono>
 #include <System.h>
+#include <fstream>
 
 #define PORT 8080
 #define VOCA_PATH "/home/kmg/ORB_SLAM3/Vocabulary/ORBvoc.txt"
@@ -73,7 +74,9 @@ int main()
         return EXIT_FAILURE;
     }
 
-    while (true)
+    ofstream ff("test.txt", ofstream::out | ofstream::trunc);
+
+    for(;;)
     {
         struct HEADER
         {
@@ -112,15 +115,31 @@ int main()
 
         //const auto t1 = chrono::steady_clock::now();
         SLAM.TrackMonocular(image, (double)tmp.stamp * 1e-9); // TODO change to monocular_inertial
+        //SLAM.TrackMonocular(image, tmp.stamp); // TODO change to monocular_inertial
         //const auto t2 = chrono::steady_clock::now();
         //auto dt = chrono::duration_cast<chrono::milliseconds>(t2 - t1).count();
         //cout << "Elapsed time in milliseconds: " << dt << "ms\n";
+
+        auto mp = SLAM.mpAtlas->GetAllMapPoints();
+
+        for(auto pt : SLAM.mpAtlas->GetAllMapPoints())
+        {
+            ff << pt->GetWorldPos().transpose() << '\n';
+        }
+
+        // if(!mp.empty())
+        // {
+        //     int i = SLAM.mpAtlas->GetLastBigChangeIdx();
+        //     auto xx = mp[i]->GetWorldPos();
+        //     cout << xx[0] << ',' << xx[1] << ',' << xx[2] << '\n';
+        // }
     }
     SLAM.Shutdown();
 
     // close sockets
     close(new_socket);
     close(server_fd);
+    ff.close();
 
     return EXIT_SUCCESS;
 }
