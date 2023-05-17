@@ -2,14 +2,12 @@ CC=g++
 COPTION=-std=c++14 -O2
 COPENCV=-L/usr/local/include/opencv2 -lopencv_videoio -lopencv_core -lopencv_imgcodecs -lopencv_highgui
 
-
 .PHONY: all
 
-all: receive
+all: main slam
 
-receive : receive.cpp
+main: main.cpp
 	$(CC) $(COPTION) $^ -o $@ $(COPENCV)
 
-.PHONY: clean
-clean :
-	rm receive
+slam: slam.cpp
+	$(CC) $(COPTION) $^ -o $@ $(COPENCV)
