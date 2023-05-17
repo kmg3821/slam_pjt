@@ -5,7 +5,10 @@
             "includePath": [
                 "${workspaceFolder}/**",
                 "/home/kmg/ORB_SLAM3/include/**",
-                "/home/kmg/ORB_SLAM3/Thirdparty/DBoW2/**"
+                "/home/kmg/ORB_SLAM3/Thirdparty/DBoW2/**",
+                "/home/kmg/octomap/octomap/include/**",
+                "/home/kmg/octomap/octovis/include/**",
+                "/home/kmg/octomap/octovis/src/**",
             ],
             "defines": [],
             "compilerPath": "/usr/bin/gcc",
