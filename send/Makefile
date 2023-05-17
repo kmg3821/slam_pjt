@@ -4,14 +4,14 @@ COPENCV=-L/usr/local/include/opencv2/ -lopencv_videoio -lopencv_core -lopencv_im
 
 .PHONY: all
 
-all : send test
+all : send send_vi
 
 send : ./send.cpp
 	$(CC) $(COPTION) $^ -o $@ $(COPENCV)
 
-test : ./test.cpp
+send_vi : ./send_vi.cpp
 	$(CC) $(COPTION) $^ -o $@ $(COPENCV)
 
 .PHONY: clean
 clean :
-	rm send test
+	rm send send_vi

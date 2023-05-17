@@ -2,6 +2,7 @@
 // g++ -std=c++14 -O2 ./send.cpp -o ./send -L/usr/local/include/opencv2/ -lopencv_videoio -lopencv_core -lopencv_imgcodecs
 
 #include <iostream>
+#include <algorithm>
 #include <cstring>
 #include <cstdlib>
 #include <arpa/inet.h>
@@ -19,13 +20,10 @@
 #include <sys/ioctl.h>
 #include <linux/i2c-dev.h>
 
-#define IP_ADDRESS "192.168.219.161"
-// #define IP_ADDRESS "192.168.110.103"
+// #define IP_ADDRESS "192.168.219.161"
+// #define IP_ADDRESS "192.168.26.33"
+#define IP_ADDRESS "192.168.110.103"
 #define PORT 8080
-
-#define ACCEL_XOUT_H 0x3B
-#define PWR_MGMT 0x6B
-#define CONFIG 0x1A
 
 using namespace std;
 using namespace cv;
@@ -79,53 +77,23 @@ int main()
 
     system("v4l2-ctl -p 20"); // fps
 
-    /////////////////////////////////////////////////////////////////////
-    // Open the I2C bus.
-    int file_i2c = open("/dev/i2c-1", O_RDWR);
-    if (file_i2c < 0)
-    {
-        cerr << "Failed to open the i2c bus" << endl;
-        return 1;
-    }
-
-    // Set the I2C address of the slave device.
-    int addr = 0x68;
-    if (ioctl(file_i2c, I2C_SLAVE, addr) < 0)
-    {
-        cerr << "Failed to acquire bus access and/or talk to slave." << endl;
-        return 1;
-    }
-
-    // Set to use the internal oscillator
-    {
-        uint8_t buf[2] = {PWR_MGMT, 0x00}; // {address, value}
-        if (write(file_i2c, buf, 2) != 2)
-        {
-            cerr << "Failed to write to the i2c bus." << endl;
-            return 1;
-        }
-    }
-
-    // Set to use the lowpass filter
-    {
-        uint8_t buf[2] = {CONFIG, 0x01}; // {address, value}
-        if (write(file_i2c, buf, 2) != 2)
-        {
-            cerr << "Failed to write to the i2c bus." << endl;
-            return 1;
-        }
-    }
-    /////////////////////////////////////////////////////////////////////
-
-    const auto t0 = chrono::high_resolution_clock::now();
-    // for(int i = 0; i < 20; ++i)
+    // const auto t0 = chrono::high_resolution_clock::now();
+    //  for(int i = 0; i < 20; ++i)
+    bool flag = 0;
     for (;;)
     {
         Mat frame;
         cap.read(frame);
-        const auto t = chrono::high_resolution_clock::now();
-        const auto tframe = chrono::duration_cast<chrono::milliseconds>(t - t0).count();
-        cout << tframe << " ms\n";
+        const auto tframe = chrono::high_resolution_clock::now().time_since_epoch().count();
+
+        struct HEADER
+        {
+            int bufsz;
+            uint64_t stamp;
+        } tmp;
+
+        // const auto tframe = chrono::duration_cast<chrono::nanoseconds>(t - t0).count();
+        // cout << tframe << " ms\n";
         if (frame.empty())
         {
             cerr << "ERROR! blank frame grabbed\n";
@@ -135,11 +103,6 @@ int main()
         vector<uchar> buffer;
         buffer.reserve(200000);
         imencode(".jpg", frame, buffer);
-        struct HEADER
-        {
-            int bufsz;
-            uint64_t stamp;
-        } tmp;
         tmp.bufsz = buffer.size();
         tmp.stamp = tframe;
         buffer.insert(buffer.begin(), (uchar *)(&tmp), (uchar *)(&tmp) + sizeof(tmp));

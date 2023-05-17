@@ -4,10 +4,13 @@ COPENCV=-L/usr/local/include/opencv2 -lopencv_videoio -lopencv_core -lopencv_img
 
 .PHONY: all
 
-all: main slam
+all: main slam vi_slam
 
 main: main.cpp
 	$(CC) $(COPTION) $^ -o $@ $(COPENCV)
 
-slam: slam.cpp
+slam: slam.cc
+	$(CC) $(COPTION) $^ -o $@ $(COPENCV)
+
+vi_slam: vi_slam.cc
 	$(CC) $(COPTION) $^ -o $@ $(COPENCV)

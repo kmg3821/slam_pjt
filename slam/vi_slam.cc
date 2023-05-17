@@ -1,4 +1,3 @@
-
 #include <iostream>
 #include <sys/socket.h>
 #include <arpa/inet.h>
@@ -8,17 +7,21 @@
 #include <sys/ioctl.h>
 #include <chrono>
 #include <System.h>
+#include "ImuTypes.h"
+#include <opencv2/core/core.hpp>
 
 #define PORT 8080
 #define VOCA_PATH "/home/kmg/ORB_SLAM3/Vocabulary/ORBvoc.txt"
-#define CAM_INTRINSIC "/home/kmg/slam_pjt/slam/cam_intrinsic.yaml"
+#define CAM_INTRINSIC "/home/kmg/slam_pjt/slam/cam_imu_intrinsic.yaml"
+#define DEGTORAD 3.141592 / 180.f
 
 using namespace std;
 using namespace cv;
 
-int main()
+double ttrack_tot = 0;
+int main(int argc, char *argv[])
 {
-    ORB_SLAM3::System SLAM(VOCA_PATH, CAM_INTRINSIC, ORB_SLAM3::System::MONOCULAR, true);
+    ORB_SLAM3::System SLAM(VOCA_PATH, CAM_INTRINSIC, ORB_SLAM3::System::IMU_MONOCULAR, true);
 
     int server_fd, new_socket;
     struct sockaddr_in address;
@@ -77,6 +80,7 @@ int main()
     {
         struct HEADER
         {
+            int imu_size;
             int img_size;
             uint64_t stamp;
         } tmp;
@@ -84,12 +88,23 @@ int main()
         int bytes_available = 0;
         while (bytes_available < sizeof(tmp))
             ioctl(new_socket, FIONREAD, &bytes_available);
+
         if (read(new_socket, &tmp, sizeof(tmp)) <= 0)
         {
             perror("read failed");
             break;
         }
-        //cout << tmp.img_size << '\n';
+        // cout << tmp.img_size << '\n';
+
+        bytes_available = 0;
+        unsigned char read_data[12 * 1000];
+        while (bytes_available < tmp.imu_size)
+            ioctl(new_socket, FIONREAD, &bytes_available);
+        if (read(new_socket, &read_data, tmp.imu_size) <= 0)
+        {
+            perror("read failed");
+            break;
+        }
 
         bytes_available = 0;
         while (bytes_available < tmp.img_size)
@@ -110,17 +125,42 @@ int main()
             break;
         }
 
-        //const auto t1 = chrono::steady_clock::now();
-        SLAM.TrackMonocular(image, (double)tmp.stamp * 1e-9); // TODO change to monocular_inertial
-        //const auto t2 = chrono::steady_clock::now();
-        //auto dt = chrono::duration_cast<chrono::milliseconds>(t2 - t1).count();
-        //cout << "Elapsed time in milliseconds: " << dt << "ms\n";
+        // Load imu measurements from previous frame
+        vector<ORB_SLAM3::IMU::Point> vImuMeas;
+        int cnt = tmp.imu_size / 12;
+        for (int i = 0; i < cnt; ++i)
+        {
+            short ax = (read_data[12 * i + 0] << 8) | read_data[12 * i + 1];
+            short ay = (read_data[12 * i + 2] << 8) | read_data[12 * i + 3];
+            short az = (read_data[12 * i + 4] << 8) | read_data[12 * i + 5];
+            short wx = (read_data[12 * i + 6] << 8) | read_data[12 * i + 7];
+            short wy = (read_data[12 * i + 8] << 8) | read_data[12 * i + 9];
+            short wz = (read_data[12 * i + 10] << 8) | read_data[12 * i + 11];
+
+            double w[3], a[3];
+            w[0] = (double)wx * DEGTORAD / 131.f;
+            w[1] = (double)wy * DEGTORAD / 131.f;
+            w[2] = (double)wz * DEGTORAD / 131.f;
+            a[0] = (double)ax * 9.81 / 16384.f;
+            a[1] = (double)ay * 9.81 / 16384.f;
+            a[2] = (double)az * 9.81 / 16384.f;
+            double imu_stamp = (tmp.stamp - (cnt - i - 1) * 5000000) * 1e-9;
+
+            //cout << imu_stamp << "(" << a[0] << "," << a[1] << "," << a[2] << ")"
+            //     << "(" << w[0] << "," << w[1] << "," << w[2] << ")\n"; 
+
+            vImuMeas.push_back(ORB_SLAM3::IMU::Point(a[0],a[1],a[2],w[0],w[1],w[2],imu_stamp));           
+        }
+        cout << vImuMeas.size() << '\n';
+
+        // const auto t1 = chrono::steady_clock::now();
+        SLAM.TrackMonocular(image, (double)tmp.stamp*1e-9, vImuMeas);
+        // const auto t2 = chrono::steady_clock::now();
+        // auto dt = chrono::duration_cast<chrono::milliseconds>(t2 - t1).count();
+        // cout << "Elapsed time in milliseconds: " << dt << "ms\n";
     }
     SLAM.Shutdown();
 
-    // close sockets
     close(new_socket);
     close(server_fd);
-
-    return EXIT_SUCCESS;
 }
