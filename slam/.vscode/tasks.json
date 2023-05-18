@@ -7,6 +7,7 @@
             "args": [
                 "-fdiagnostics-color=always",
                 "-O2",
+                "-fPIC",
                 "-std=c++14",
                 "-Wno-deprecated-declarations",
                 "${file}",
@@ -36,7 +37,25 @@
                 "-lboost_serialization",
                 "-lcrypto",
                 "-lORB_SLAM3",
-                "-DCOMPILEDWITHC11 -DHAVE_EIGEN -DHAVE_GLEW -DHAVE_PYTHON -DPANGO_DEFAULT_WIN_URI=\"wayland\" -D_LINUX_"
+                "-DCOMPILEDWITHC11 -DHAVE_EIGEN -DHAVE_GLEW -DHAVE_PYTHON -DPANGO_DEFAULT_WIN_URI=\"wayland\" -D_LINUX_",
+                "-L/home/kmg/octomap/lib/",
+                "-loctomap",
+                "-loctovis",
+                "-loctomath",
+                "-ldynamicedt3d",
+                "-I/home/kmg/octomap/octomap/include/octomap/",
+                "-I/home/kmg/octomap/octovis/include/octovis/",
+                "-I/home/kmg/octomap/octomap/include/",
+                "-I/home/kmg/octomap/octovis/include/",
+                "-I/usr/include/x86_64-linux-gnu/qt5/QtCore/",
+                "-I/usr/include/x86_64-linux-gnu/qt5/",
+                "-I/usr/include/x86_64-linux-gnu/qt5/",
+                "-I/usr/include/x86_64-linux-gnu/qt5/QtWidgets/",
+                "-I/usr/include/QGLViewer/",
+                "-I/usr/include/x86_64-linux-gnu/qt5/QtXml/",
+                "-I/usr/include/x86_64-linux-gnu/qt5/QtGui/",
+                "-I/usr/include/x86_64-linux-gnu/qt5/QtOpenGL/",
+                "-I/home/kmg/octomap/build/octovis/",
             ],
             "options": {
                 "cwd": "${fileDirname}"
@@ -53,3 +72,5 @@
     ],
     "version": "2.0.0"
 }
+
+
