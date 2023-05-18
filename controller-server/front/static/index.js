@@ -1,4 +1,4 @@
-const modelServer = "127.0.0.1"
+const modelServer = env['modelServer']
 const modelPort   = 8081
 
 const imagePlaceholder = document.querySelector(".camera");
