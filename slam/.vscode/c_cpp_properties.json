@@ -9,6 +9,7 @@
                 "/home/kmg/octomap/octomap/include/**",
                 "/home/kmg/octomap/octovis/include/**",
                 "/home/kmg/octomap/octovis/src/**",
+                "/usr/include/**",
             ],
             "defines": [],
             "compilerPath": "/usr/bin/gcc",
