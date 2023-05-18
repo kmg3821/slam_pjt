@@ -18,31 +18,31 @@
 
 using namespace std;
 using namespace cv;
-using namespace octomap;
 
-// void bar()
-// {
-//     int argc = 1;
-//     char* argv[] = {"simple_tree.bt"};
-//     QApplication app(argc, argv);
-//     ViewerGui gui("simple_tree.bt", NULL, 0);
-//     gui.show();
-//     app.exec();
-// }
-
-bool flag;
-void foo(const ORB_SLAM3::System &SLAM)
+bool flag[2] = {1,1};
+void foo(ORB_SLAM3::System &SLAM)
 {
-    while (flag)
+    while (flag[0])
     {
-        const auto ss = SLAM.mpAtlas->GetAllKeyFrames();
-        const auto mp = SLAM.mpAtlas->GetAllMapPoints();
-        const int len = mp.size();
-        for (int i = 0; i < len; ++i)
-        {
-            const auto tmp = mp[i]->GetWorldPos();
-            
-        }
+        // while(flag[1]);
+        flag[1] = 1;
+        const auto mps = SLAM.mpAtlas->GetAllKeyFrames();
+
+        if(SLAM.MapChanged())
+            cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1\n";
+        // int len = mps.size();
+        // cout << "len: " << len << "\n"; 
+        // if(len == 0) continue;
+
+        // for (int i = 0; i < 1; ++i)
+        // {
+        //     const auto kf = mps[i];
+        //     const auto pose = kf->GetPose();
+        //     const auto mat = pose.matrix3x4();
+        //     cout << i << "------------------------------\n";
+        //     cout << mat << '\n';
+        //     cout << "-------------------------------\n";
+        // }
 
         usleep(200 * 1000);
     }
@@ -105,12 +105,9 @@ int main()
         return EXIT_FAILURE;
     }
 
-    flag = 1;
     thread thPoints(foo, ref(SLAM));
-    //thread thGui(bar);
-    //system("~/octomap/bin/octovis ~/slam_pjt/slam/simple_tree.bt");
 
-    for (int i = 0; i < 1000; ++i)
+    for (int i = 0;;)
     {
         struct HEADER
         {
@@ -149,16 +146,17 @@ int main()
 
         // const auto t1 = chrono::steady_clock::now();
         SLAM.TrackMonocular(image, (double)tmp.stamp * 1e-9); // TODO change to monocular_inertial
+        flag[1] = 0;
         // SLAM.TrackMonocular(image, tmp.stamp); // TODO change to monocular_inertial
         // const auto t2 = chrono::steady_clock::now();
         // auto dt = chrono::duration_cast<chrono::milliseconds>(t2 - t1).count();
         // cout << "Elapsed time in milliseconds: " << dt << "ms\n";
     }
-    flag = 0;
+    flag[0] = 0;
+    flag[1] = 0;
     thPoints.join();
     close(new_socket);
     close(server_fd);
-    //thGui.join();
 
     SLAM.Shutdown();
 
