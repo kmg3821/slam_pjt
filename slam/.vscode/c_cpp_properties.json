@@ -7,10 +7,9 @@
                 "/home/kmg/ORB_SLAM3/include/**",
                 "/home/kmg/ORB_SLAM3/Thirdparty/DBoW2/**",
                 "/home/kmg/ORB_SLAM3/Thirdparty/Sophus/**",
-                "/home/kmg/octomap/octomap/include/**",
-                "/home/kmg/octomap/octovis/include/**",
-                "/home/kmg/octomap/octovis/src/**",
-                "/usr/include/**"
+                "/usr/local/include/pcl-1.13/**",
+                "/usr/lib/x86_64-linux-gnu/**",
+                "/usr/local/include/vtk-9.2"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/gcc",

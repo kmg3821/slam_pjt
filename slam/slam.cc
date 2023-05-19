@@ -8,6 +8,7 @@
 #include <sys/ioctl.h>
 #include <chrono>
 #include <System.h>
+#include<omp.h>
 
 #include <fstream>
 #include <thread>
@@ -19,30 +20,42 @@
 using namespace std;
 using namespace cv;
 
-bool flag[2] = {1,1};
+bool flag[2] = {1, 1};
 void foo(ORB_SLAM3::System &SLAM)
 {
+    const int cell_size = 1000;
+    cv::Mat canvas(cell_size, cell_size, CV_8UC3, cv::Scalar(0, 0, 0)); // Creating a blank canvas
+    float res = 0.005; // 0.005 m/cell
+
     while (flag[0])
     {
-        // while(flag[1]);
-        flag[1] = 1;
-        const auto mps = SLAM.mpAtlas->GetAllKeyFrames();
+        //if(SLAM.MapChanged())
+        canvas.setTo(0);
 
-        if(SLAM.MapChanged())
-            cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1\n";
-        // int len = mps.size();
-        // cout << "len: " << len << "\n"; 
-        // if(len == 0) continue;
 
-        // for (int i = 0; i < 1; ++i)
-        // {
-        //     const auto kf = mps[i];
-        //     const auto pose = kf->GetPose();
-        //     const auto mat = pose.matrix3x4();
-        //     cout << i << "------------------------------\n";
-        //     cout << mat << '\n';
-        //     cout << "-------------------------------\n";
-        // }
+        const auto kfs = SLAM.mpAtlas->GetAllKeyFrames();
+        int kfs_len = kfs.size();
+
+        #pragma omp parallel for schedule(dynamic,1) collapse(2)
+        for (int i = 0; i < kfs_len; ++i)
+        {
+            const auto p0 = kfs[i]->GetPose().translation();
+            const int x0 = (p0(0) / res) + 250;
+            const int y0 = (p0(1) / res) + 250;
+            for (const auto mp : kfs[i]->GetMapPoints())
+            {
+                const auto p = mp->GetWorldPos();
+            
+                const int x = (p(0) / res) + cell_size / 2;
+                const int y = (p(1) / res) + cell_size / 2;
+
+                const Point startPoints(x0, y0);
+                const Point endPoints(x, y);
+                line(canvas, startPoints, endPoints, Scalar(255, 0, 0), 1);
+            }
+        }
+        imshow("Canvas", canvas);
+        waitKey(1);
 
         usleep(200 * 1000);
     }

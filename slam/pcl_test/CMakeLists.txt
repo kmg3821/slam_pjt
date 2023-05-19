@@ -4,10 +4,10 @@ project(pcl_test)
 
 add_executable(pcl pcl.cpp)
 
-find_package (PCL 1.12 REQUIRED COMPONENTS common visualization io)
+find_package (PCL 1.13)
 
 include_directories(${PCL_INCLUDE_DIRS})
+link_directories(${PCL_LIBRARY_DIRS})
+add_definitions(${PCL_DEFINITIONS})
 
-link_libraries(${PCL_LIBRARY_DIRS})
-
-target_link_libraries(pcl ${PCL_LIBRARIES} -lpcl_filters)
+target_link_libraries(pcl ${PCL_LIBRARIES})
