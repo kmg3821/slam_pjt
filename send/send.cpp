@@ -77,7 +77,9 @@ int main()
         cap.read(frame);
         const auto tframe = chrono::high_resolution_clock::now().time_since_epoch().count();
         uint32_t bufsz;
+	uchar* cbufsz = (uchar*)&bufsz;
         uint64_t stamp;
+	uchar* cstamp = (uchar*)&stamp;
 
         // const auto tframe = chrono::duration_cast<chrono::nanoseconds>(t - t0).count();
         // cout << tframe << " ms\n";
@@ -91,7 +93,17 @@ int main()
         imencode(".jpg", frame, buffer);
         bufsz = buffer.size();
         stamp = tframe;
-        buffer.insert(buffer.begin(), (uchar *)(&stamp), (uchar *)(&stamp) + sizeof(stamp));
+	for(int i = 0;i < 2;i++){
+	    uchar buf = cbufsz[i];
+	    cbufsz[i] = cbufsz[3 - i];
+	    cbufsz[3 - i] = buf;
+	}
+	for(int i = 0;i < 4;i++){
+	    uchar buf = cstamp[i];
+	    cstamp[i] = cstamp[7 - i];
+	    cstamp[7-i] = buf;
+	}
+	buffer.insert(buffer.begin(), (uchar *)(&stamp), (uchar *)(&stamp) + sizeof(stamp));
 	buffer.insert(buffer.begin(), (uchar *)(&bufsz), (uchar *)(&bufsz) + sizeof(bufsz));
 	try{
 	    mqtt::token_ptr tok = topic.publish(string(buffer.begin(), buffer.end()));
