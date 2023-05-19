@@ -16,13 +16,15 @@ const getImage = async function(){
 	await axios.get(backend + "/image/recent")
 	.then((res)=>{
 		if(res.status === 200){
-			this.ok = true;
-			this.imageUrl = res.data.imageUrl;
-			//console.log(this.imageUrl);
+			console.log(res.data);
+			console.log(res.data['image']);
+			imageUrl = res.data['image'];
+			imagePlaceholder.src = backend + '/' + imageUrl;
+			console.log(backend + imageUrl);
 		}
 	})
 	.catch((error)=>{
-		this.ok = false;
+		ok = false;
 	});
 	if(ok){
 		const image    = axios.get(backend + imageUrl);

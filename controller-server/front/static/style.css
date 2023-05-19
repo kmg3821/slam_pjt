@@ -1,5 +1,6 @@
 body{
-  height: 100vh;
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
   width: 100%;
   display:flex;
   flex-direction: column;
@@ -39,6 +40,9 @@ body{
 .btn{
   font-size: 50px;
   color: rgb(56, 56, 56);
+  -webkit-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
 }
 .btn:hover{
   color: blue;
