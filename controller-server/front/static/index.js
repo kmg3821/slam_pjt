@@ -20,7 +20,7 @@ const getImage = async function(){
 			console.log(res.data['image']);
 			imageUrl = res.data['image'];
 			imagePlaceholder.src = backend + '/' + imageUrl;
-			console.log(backend + imageUrl);
+			console.log(backend + '/' + imageUrl);
 		}
 	})
 	.catch((error)=>{
@@ -32,7 +32,7 @@ const getImage = async function(){
 	}
 }
 
-setInterval(getImage, 1000);
+setInterval(getImage, 100);
 
 eventList = [[topButton, "top"], [downButton, "bottom"], [leftButton, "left"], [rightButton, "right"]];
 
