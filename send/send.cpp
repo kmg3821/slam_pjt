@@ -22,6 +22,7 @@
 #include <linux/i2c-dev.h>
 
 #include <mqtt/client.h>
+//please refer to https://github.com/eclipse/paho.mqtt.cpp
 
 using namespace std;
 using namespace cv;
