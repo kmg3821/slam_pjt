@@ -1,15 +1,22 @@
-
 body{
-  height: 95vh;
-  width: 95vw;
+  height: 100vh;
+  width: 100%;
   display:flex;
   flex-direction: column;
   justify-content: space-between;
+  margin: 0;
+}
+.main{
+  width: 100%;
+  display:flex;
+  flex-direction: row;
+  justify-content: center;
 }
 .camera{
-  width: 640px;
-  height: 480px;
-  background-image: url("placeholder.png");
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 640px;
+  padding: 10px;
 }
 .footer{
   width: 100%;
@@ -20,6 +27,9 @@ body{
 .controller-ui{
   height: 200px;
   width: 300px;
+  box-sizing: border-box;
+  padding-bottom: 10px;
+  padding-right: 10px;
   /*margin-bottom: 50px;
   margin-right: 50px;*/
   display:grid;

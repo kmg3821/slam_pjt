@@ -7,6 +7,7 @@ const morgan = require('morgan');
 
 const app = express();
 app.use(cors());
+app.use(express.json());
 app.use('/image', express.static('image'));
 app.use(morgan('dev'));
 
@@ -25,7 +26,7 @@ app.get('/image/recent', (req, res)=>{
 	json = {"status":"continue..."};
 	lock.acquire('file-io', ()=>{
 		if (imageSrc === null){
-			status_code = 404;
+			status_code = 204;
 			json = {"status": "image not taken yet"};
 		}
 		else{
@@ -36,10 +37,16 @@ app.get('/image/recent', (req, res)=>{
 	return res.status(status_code).json(json);
 });
 
+app.post("/event", (req, res)=>{
+	console.log("[mqtt]: published topic= rc/" + req.body.key + " " + req.body.pushed);
+	
+	client.publish(`rc/${req.body.key}`, (req.body.pushed?"1":"0"));
+	return res.status(200).json({"status":"received"});	
+});
+
 app.listen(backend_port, ()=>{
 	console.log(`Webserver backend is ready on port ${backend_port}`);
-})
-
+});
 
 client.on("connect", () => {
 	console.log("MQTT Client connected to port 1883");
