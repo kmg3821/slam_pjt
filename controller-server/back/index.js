@@ -56,7 +56,7 @@ client.on('message', (topic, message, packet)=>{
 		console.log(`image size is : ${message.readUInt32BE(0)}`);
 		console.log(`timestamp  is : ${message.readBigUInt64BE(4)}`);
 		lock.acquire('file-io', ()=>{
-			imageSrc = `image/received-${message.readBigUInt64BE(4)}.png`;
+			imageSrc = `image/received-${message.readBigUInt64BE(4)}.jpg`;
 			fs.writeFile(imageSrc, message.slice(12), (err)=>{
 				if(err) {
 					console.log(err);

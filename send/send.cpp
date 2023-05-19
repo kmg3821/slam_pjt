@@ -2,6 +2,7 @@
 // g++ -std=c++14 -O2 ./send.cpp -o ./send -L/usr/local/include/opencv2/ -lopencv_videoio -lopencv_core -lopencv_imgcodecs
 
 #include <iostream>
+#include <fstream>
 #include <algorithm>
 #include <cstring>
 #include <cstdlib>
@@ -20,46 +21,37 @@
 #include <sys/ioctl.h>
 #include <linux/i2c-dev.h>
 
-// #define IP_ADDRESS "192.168.219.161"
-// #define IP_ADDRESS "192.168.26.33"
-#define IP_ADDRESS "192.168.110.103"
-#define PORT 8080
+#include <mqtt/client.h>
 
 using namespace std;
 using namespace cv;
 
 int main()
 {
-    // create a socket
-    int sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock == -1)
-    {
-        cerr << "Failed to create socket." << endl;
-        return EXIT_FAILURE;
+    //read ip address from config.txt
+    ifstream configFile("config.txt");
+    string line;
+    string IP_ADDRESS;
+
+    while (getline(configFile, line)) {
+        if (line.substr(0, 11) == "IP_ADDRESS=") {
+            IP_ADDRESS = line.substr(11);
+            break;
+        }
     }
+    configFile.close();
 
-    // specify the address and port of the server to connect to
-    struct sockaddr_in server_address;
-    memset(&server_address, 0, sizeof(server_address));
-    server_address.sin_family = AF_INET;
-    server_address.sin_port = htons(PORT);
-    inet_pton(AF_INET, IP_ADDRESS, &server_address.sin_addr);
 
-    // connect to the server
-    if (connect(sock, (struct sockaddr *)&server_address, sizeof(server_address)) == -1)
-    {
-        cerr << "Failed to connect to server." << endl;
-        return EXIT_FAILURE;
-    }
-
-    // send the images
+    mqtt::async_client cli(IP_ADDRESS, "");
+    cli.connect()->wait();
+    mqtt::topic topic(cli, "img", 0);
+    //send image
     VideoCapture cap("/dev/video0");
     if (!cap.isOpened())
     {
         cerr << "Failed to open video file." << endl;
         return EXIT_FAILURE;
     }
-
     system("v4l2-ctl -c brightness=85"); // 0 ~ 100, default = 50
     system("v4l2-ctl -c contrast=80");   // -100 ~ 100, default = 0
     system("v4l2-ctl -c saturation=80"); // -100 ~ 100, default = 0
@@ -74,9 +66,7 @@ int main()
     system("v4l2-ctl -c iso_sensitivity=4");        // 0 ~ 4, default = 0
     system("v4l2-ctl -c iso_sensitivity_auto=1");   // 0:manual, 1:auto
     system("v4l2-ctl -c exposure_metering_mode=0"); // 0:average, 1:center, 2:spot, 3:matrix
-
     system("v4l2-ctl -p 20"); // fps
-
     // const auto t0 = chrono::high_resolution_clock::now();
     //  for(int i = 0; i < 20; ++i)
     bool flag = 0;
@@ -85,12 +75,8 @@ int main()
         Mat frame;
         cap.read(frame);
         const auto tframe = chrono::high_resolution_clock::now().time_since_epoch().count();
-
-        struct HEADER
-        {
-            int bufsz;
-            uint64_t stamp;
-        } tmp;
+        uint32_t bufsz;
+        uint64_t stamp;
 
         // const auto tframe = chrono::duration_cast<chrono::nanoseconds>(t - t0).count();
         // cout << tframe << " ms\n";
@@ -99,23 +85,29 @@ int main()
             cerr << "ERROR! blank frame grabbed\n";
             break;
         }
-
-        vector<uchar> buffer;
-        buffer.reserve(200000);
+	vector<uchar> buffer;
+	buffer.reserve(200000);
         imencode(".jpg", frame, buffer);
-        tmp.bufsz = buffer.size();
-        tmp.stamp = tframe;
-        buffer.insert(buffer.begin(), (uchar *)(&tmp), (uchar *)(&tmp) + sizeof(tmp));
-        const int bytes_sent = send(sock, buffer.data(), buffer.size(), 0);
-        if (bytes_sent == -1)
-        {
-            cerr << "Failed to send image data." << endl;
-            return EXIT_FAILURE;
-        }
+        bufsz = buffer.size();
+        stamp = tframe;
+        buffer.insert(buffer.begin(), (uchar *)(&stamp), (uchar *)(&stamp) + sizeof(stamp));
+	buffer.insert(buffer.begin(), (uchar *)(&bufsz), (uchar *)(&bufsz) + sizeof(bufsz));
+	try{
+	    mqtt::token_ptr tok = topic.publish(string(buffer.begin(), buffer.end()));
+	    //tok->wait();
+	}
+	catch(const mqtt::exception& exc){
+		cerr << "Failed to send image data." << endl;
+		return EXIT_FAILURE;
+	}
+	//if (bytes_sent == -1)
+        //{
+        //    cerr << "Failed to send image data." << endl;
+        //    return EXIT_FAILURE;
+        //}
     }
 
     // close the socket and video capture
-    close(sock);
     cap.release();
 
     return EXIT_SUCCESS;
