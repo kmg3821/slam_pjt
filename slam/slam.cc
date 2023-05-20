@@ -8,9 +8,9 @@
 #include <sys/ioctl.h>
 #include <chrono>
 #include <System.h>
-#include<omp.h>
 
-#include <fstream>
+#include <omp.h>
+#include <atomic>
 #include <thread>
 
 #define PORT 8080
@@ -20,44 +20,183 @@
 using namespace std;
 using namespace cv;
 
+const int cell_size = 1000;
+atomic<unsigned long long> atomic_cnts[2][cell_size][cell_size]; // 0:visited, 1:occupied
+
+bool check_boundary(int r, int c)
+{
+    if (r < 0 || c < 0 || r >= cell_size || c >= cell_size)
+        return false;
+    return true;
+}
+
+void bresenham(int x1, int y1, int x2, int y2)
+{
+    atomic_cnts[1][y2][x2].fetch_add(1);
+    if (x1 == x2)
+    {
+        if (y1 > y2)
+            swap(y1, y2);
+
+        while (y1 <= y2)
+        {
+            atomic_cnts[0][y1][x1].fetch_add(1);
+            y1++;
+        }
+    }
+    else
+    {
+        if (x1 > x2)
+        {
+            swap(x1, x2);
+            swap(y1, y2);
+        }
+        if (y1 == y2)
+        {
+            while (x1 <= x2)
+            {
+                atomic_cnts[0][y1][x1].fetch_add(1);
+                x1++;
+            }
+        }
+        else
+        {
+            if (y1 > y2)
+            {
+                int y0 = y1;
+                y2 = y1 + (y1 - y2);
+
+                int dx = x2 - x1;
+                int dy = y2 - y1;
+                int p = 2 * dy - dx;
+                while (x1 <= x2)
+                {
+                    atomic_cnts[0][y0 - (y1 - y0)][x1].fetch_add(1);
+                    x1++;
+                    if (p < 0)
+                    {
+                        p = p + 2 * dy;
+                    }
+                    else
+                    {
+                        p = p + 2 * dy - 2 * dx;
+                        y1++;
+                    }
+                }
+            }
+            else
+            {
+                int dx = x2 - x1;
+                int dy = y2 - y1;
+                int p = 2 * dy - dx;
+                while (x1 <= x2)
+                {
+                    atomic_cnts[0][y1][x1].fetch_add(1);
+                    x1++;
+                    if (p < 0)
+                    {
+                        p = p + 2 * dy;
+                    }
+                    else
+                    {
+                        p = p + 2 * dy - 2 * dx;
+                        y1++;
+                    }
+                }
+            }
+        }
+    }
+}
+
+void drawOccupancyMap(Mat &canvas)
+{
+
+#pragma omp parallel for schedule(dynamic, 1) collapse(2)
+    for (int i = 0; i < cell_size; ++i)
+    {
+        for (int j = 0; j < cell_size; ++j)
+        {
+            if (atomic_cnts[0][i][j] == 0)
+                continue;
+            const int prob = 100 - (atomic_cnts[1][i][j] * 100) / atomic_cnts[0][i][j]; // 비어있는 확률
+            if (prob < 20)
+            {
+                circle(canvas, Point(j, i), 0, Scalar(0, 0, 0), 5);
+            }
+            else if (prob > 80)
+            {
+                circle(canvas, Point(j, i), 0, Scalar(255, 255, 255));
+            }
+        }
+    }
+}
+
 bool flag[2] = {1, 1};
+Sophus::Vector3f now;
 void foo(ORB_SLAM3::System &SLAM)
 {
-    const int cell_size = 1000;
-    cv::Mat canvas(cell_size, cell_size, CV_8UC3, cv::Scalar(0, 0, 0)); // Creating a blank canvas
-    float res = 0.005; // 0.005 m/cell
+    Mat canvas(cell_size, cell_size, CV_8UC3, cv::Scalar(120, 120, 120)); // Creating a blank canvas
+    const float res = 0.01;                                               // 0.005 m/cell
 
     while (flag[0])
     {
-        //if(SLAM.MapChanged())
-        canvas.setTo(0);
+        canvas.setTo(cv::Scalar(120, 120, 120));
 
+        if (SLAM.isLost() || SLAM.MapChanged())
+        {
+#pragma omp parallel for schedule(dynamic, 1) collapse(2)
+            for (int i = 0; i < cell_size; ++i)
+            {
+                for (int j = 0; j < cell_size; ++j)
+                {
+                    atomic_cnts[0][i][j].store(0);
+                    atomic_cnts[1][i][j].store(0);
+                }
+            }
+        }
 
         const auto kfs = SLAM.mpAtlas->GetAllKeyFrames();
+        SLAM.GetTrackedMapPoints()
         int kfs_len = kfs.size();
 
-        #pragma omp parallel for schedule(dynamic,1) collapse(2)
+#pragma omp parallel for schedule(dynamic, 1) collapse(2)
         for (int i = 0; i < kfs_len; ++i)
         {
-            const auto p0 = kfs[i]->GetPose().translation();
-            const int x0 = (p0(0) / res) + 250;
-            const int y0 = (p0(1) / res) + 250;
+            const auto p0 = kfs[i]->GetOw();
+            const int x0 = (int)(p0(0) / res) + cell_size / 2;
+            const int y0 = (int)(-p0(2) / res) + cell_size / 2;
             for (const auto mp : kfs[i]->GetMapPoints())
             {
                 const auto p = mp->GetWorldPos();
-            
-                const int x = (p(0) / res) + cell_size / 2;
-                const int y = (p(1) / res) + cell_size / 2;
+                const int x = (int)(p(0) / res) + cell_size / 2;
+                const int y = (int)(-p(2) / res) + cell_size / 2;
 
-                const Point startPoints(x0, y0);
-                const Point endPoints(x, y);
-                line(canvas, startPoints, endPoints, Scalar(255, 0, 0), 1);
+                // const Point startPoints(x0, y0);
+                // const Point endPoints(x, y);
+                // line(canvas, startPoints, endPoints, Scalar(255, 255, 255), 1);
+                if (!check_boundary(x0, y0) || !check_boundary(x, y))
+                    continue;
+                bresenham(x0, y0, x, y);
             }
         }
+
+        drawOccupancyMap(canvas);
+
+        const int x = (int)(now(0) / res) + cell_size / 2;
+        const int y = (int)(-now(2) / res) + cell_size / 2;
+        circle(canvas, Point(x, y), 0, cv::Scalar(0, 0, 255), 15);
+        cout << "(" << y << "," << x << ")\n";
+
+        // for (int i = 0; i < kfs_len; ++i)
+        // {
+        //     const auto p0 = kfs[i]->GetPose().translation();
+        //     cout << p0.transpose() << endl;
+        // }
+
         imshow("Canvas", canvas);
         waitKey(1);
 
-        usleep(200 * 1000);
+        usleep(100 * 1000);
     }
 }
 
@@ -158,8 +297,7 @@ int main()
         }
 
         // const auto t1 = chrono::steady_clock::now();
-        SLAM.TrackMonocular(image, (double)tmp.stamp * 1e-9); // TODO change to monocular_inertial
-        flag[1] = 0;
+        now = SLAM.TrackMonocular(image, (double)tmp.stamp * 1e-9).inverse().translation(); // TODO change to monocular_inertial
         // SLAM.TrackMonocular(image, tmp.stamp); // TODO change to monocular_inertial
         // const auto t2 = chrono::steady_clock::now();
         // auto dt = chrono::duration_cast<chrono::milliseconds>(t2 - t1).count();

@@ -75,6 +75,7 @@
         "netfwd": "cpp",
         "future": "cpp",
         "shared_mutex": "cpp",
-        "valarray": "cpp"
+        "valarray": "cpp",
+        "*.ipp": "cpp"
     }
 }
