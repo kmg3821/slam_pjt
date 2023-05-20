@@ -12,7 +12,6 @@
 #include <omp.h>
 #include <atomic>
 #include <thread>
-#include <mutex>
 
 #define PORT 8080
 #define VOCA_PATH "/home/kmg/ORB_SLAM3/Vocabulary/ORBvoc.txt"
@@ -23,8 +22,6 @@ using namespace cv;
 
 const int cell_size = 800;
 atomic<unsigned long long> atomic_cnts[2][cell_size][cell_size]; // 0:visited, 1:occupied
-bool visited[cell_size][cell_size];
-vector<pair<int, int>> history;
 
 bool check_boundary(int r, int c)
 {
@@ -45,11 +42,6 @@ void bresenham(int r1, int c1, int r2, int c2)
         {
             if (!check_boundary(r1, c1))
                 break;
-            if (!visited[r1][c1])
-            {
-                visited[r1][c1] = 1;
-                history.push_back({r1, c1});
-            }
             atomic_cnts[0][r1][c1].fetch_add(1);
             r1++;
         }
@@ -67,11 +59,6 @@ void bresenham(int r1, int c1, int r2, int c2)
             {
                 if (!check_boundary(r1, c1))
                     break;
-                if (!visited[r1][c1])
-                {
-                    visited[r1][c1] = 1;
-                    history.push_back({r1, c1});
-                }
                 atomic_cnts[0][r1][c1].fetch_add(1);
                 c1++;
             }
@@ -87,17 +74,12 @@ void bresenham(int r1, int c1, int r2, int c2)
 
                 if (dr <= dc)
                 {
-                    int r0 = r1;
+                    const int r0 = r1;
                     int p = 2 * dr - dc;
                     while (c1 <= c2)
                     {
                         if (!check_boundary(r0 - (r1 - r0), c1))
                             break;
-                        if (!visited[r0 - (r1 - r0)][c1])
-                        {
-                            visited[r0 - (r1 - r0)][c1] = 1;
-                            history.push_back({r0 - (r1 - r0), c1});
-                        }
                         atomic_cnts[0][r0 - (r1 - r0)][c1].fetch_add(1);
                         c1++;
                         if (p < 0)
@@ -115,16 +97,11 @@ void bresenham(int r1, int c1, int r2, int c2)
                     swap(c1, r1);
                     swap(c2, r2);
                     int p = 2 * dr - dc;
-                    int c0 = c1;
+                    const int c0 = c1;
                     while (c1 <= c2)
                     {
                         if (!check_boundary(c0 - (c1 - c0), r1))
                             break;
-                        if (!visited[c0 - (c1 - c0)][r1])
-                        {
-                            visited[c0 - (c1 - c0)][r1] = 1;
-                            history.push_back({c0 - (c1 - c0), r1});
-                        }
                         atomic_cnts[0][c0 - (c1 - c0)][r1].fetch_add(1);
                         c1++;
                         if (p < 0)
@@ -149,11 +126,6 @@ void bresenham(int r1, int c1, int r2, int c2)
                     {
                         if (!check_boundary(r1, c1))
                             break;
-                        if (!visited[r1][c1])
-                        {
-                            visited[r1][c1] = 1;
-                            history.push_back({r1, c1});
-                        }
                         atomic_cnts[0][r1][c1].fetch_add(1);
                         c1++;
                         if (p < 0)
@@ -175,11 +147,6 @@ void bresenham(int r1, int c1, int r2, int c2)
                     {
                         if (!check_boundary(c1, r1))
                             break;
-                        if (!visited[c1][r1])
-                        {
-                            visited[c1][r1] = 1;
-                            history.push_back({c1, r1});
-                        }
                         atomic_cnts[0][c1][r1].fetch_add(1);
                         c1++;
                         if (p < 0)
@@ -199,36 +166,34 @@ void bresenham(int r1, int c1, int r2, int c2)
 void drawOccupancyMap(Mat &canvas)
 {
 
-#pragma omp parallel for schedule(dynamic, 1)
-    for (const auto pos : history)
+#pragma omp parallel for schedule(dynamic, 1) collapse(4)
+    for (int i = 0; i < cell_size; ++i)
     {
-        const int i = pos.first;
-        const int j = pos.second;
-
-        if (atomic_cnts[0][i][j] < 5)
-            continue;
-
-        int visit_cnt = 0;
-        int occupy_cnt = 0;
-        for (int dr = -1; dr <= 1; ++dr)
+        for (int j = 0; j < cell_size; ++j)
         {
-            for (int dc = -1; dc <= 1; ++dc)
+            int visit_cnt = 0;
+            int occupy_cnt = 0;
+            for (int dr = -1; dr <= 1; ++dr)
             {
-                if (!check_boundary(i + dr, j + dc))
-                    continue;
-                visit_cnt += atomic_cnts[0][i + dr][j + dc];
-                occupy_cnt += atomic_cnts[1][i + dr][j + dc];
+                for (int dc = -1; dc <= 1; ++dc)
+                {
+                    if (!check_boundary(i + dr, j + dc))
+                        continue;
+                    visit_cnt += atomic_cnts[0][i + dr][j + dc];
+                    occupy_cnt += atomic_cnts[1][i + dr][j + dc];
+                }
             }
-        }
+            if(visit_cnt < 5) continue;
 
-        const int prob = 100 - (occupy_cnt * 100) / visit_cnt; // 비어있는 확률
-        if (prob < 80)
-        {
-            circle(canvas, Point(j, i), 0, Scalar(0, 0, 0), 3);
-        }
-        else if (prob > 80)
-        {
-            circle(canvas, Point(j, i), 0, Scalar(255, 255, 255));
+            const int prob = (occupy_cnt * 100) / visit_cnt;
+            if (prob > 20)
+            {
+                circle(canvas, Point(j, i), 0, Scalar(0, 0, 0), 3);
+            }
+            else
+            {
+                circle(canvas, Point(j, i), 0, Scalar(255, 255, 255));
+            }
         }
     }
 }
@@ -239,25 +204,23 @@ void foo(ORB_SLAM3::System &SLAM)
 {
     Mat canvas(cell_size, cell_size, CV_8UC3, cv::Scalar(120, 120, 120)); // Creating a blank canvas
     const float res = 0.01;                                               // 0.01 m/cell
-    history.reserve(100000);
 
     while (flag)
     {
-#pragma omp parallel for schedule(dynamic, 1)
-        for (const auto pos : history)
+#pragma omp parallel for schedule(dynamic, 1) collapse(2)
+        for (int i = 0; i < cell_size; ++i)
         {
-            const int i = pos.first;
-            const int j = pos.second;
-            atomic_cnts[0][i][j].store(0);
-            atomic_cnts[1][i][j].store(0);
+            for (int j = 0; j < cell_size; ++j)
+            {
+                atomic_cnts[0][i][j].store(0);
+                atomic_cnts[1][i][j].store(0);
+            }
         }
 
         canvas.setTo(cv::Scalar(120, 120, 120));
-        memset(visited, 0, sizeof(visited));
-        history.clear();
 
         const auto mps = SLAM.mpAtlas->GetAllMapPoints();
-        int mps_len = mps.size();
+        const int mps_len = mps.size();
 
 #pragma omp parallel for schedule(dynamic, 1)
         for (int i = 0; i < mps_len; ++i)
@@ -293,8 +256,8 @@ int main()
 
     int server_fd, new_socket;
     struct sockaddr_in address;
-    int opt = 1;
-    int addrlen = sizeof(address);
+    const int opt = 1;
+    const int addrlen = sizeof(address);
 
     // create socket file descriptor
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0)
@@ -311,7 +274,7 @@ int main()
     }
 
     // set socket receive buffer
-    int buf_size = 200000 * 1000;
+    const int buf_size = 200000 * 1000;
     if (setsockopt(server_fd, SOL_SOCKET, SO_RCVBUF, &buf_size, sizeof(buf_size)))
     {
         perror("setsockopt failed");
