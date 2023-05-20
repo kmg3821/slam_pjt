@@ -169,18 +169,22 @@ void drawOccupancyMap(Mat &canvas)
 int main()
 {
     Mat canvas(cell_size, cell_size, CV_8UC3, cv::Scalar(120, 120, 120)); // Creating a blank canvas
-    const float res = 0.01; // m/cell
+    const float res = 0.01;                                               // m/cell
 
-    const int c0 = cell_size / 2 + (int)(2.0f / res); // x
-    const int r0 = cell_size / 2 - (int)(0.1f / res); // y
+    const int c0 = cell_size / 2 + (int)(1.0f / res);  // x
+    const int r0 = cell_size / 2 - (int)(-2.1f / res); // y
 
-    const int c = cell_size / 2 + (int)(1.0f / res); // x
-    const int r = cell_size / 2 - (int)(-4.0f / res); // y
+    float arr[4][2] = {2, 3.5, -1, 4, -4, -3, 3, -2.2};
 
-    bresenham(r0, c0, r, c);
+    for (int i = 0; i < 4; ++i)
+    {
+        const int c = cell_size / 2 + (int)(arr[i][0] / res);  // x
+        const int r = cell_size / 2 - (int)(arr[i][1] / res); // y
 
-    drawOccupancyMap(canvas);
+        bresenham(r0, c0, r, c);
 
-    imshow("Canvas", canvas);
-    waitKey(2000);
+        drawOccupancyMap(canvas);
+        imshow("Canvas", canvas);
+        waitKey(2000);
+    }
 }

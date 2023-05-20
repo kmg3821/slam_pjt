@@ -12,6 +12,7 @@
 #include <omp.h>
 #include <atomic>
 #include <thread>
+#include <mutex>
 
 #define PORT 8080
 #define VOCA_PATH "/home/kmg/ORB_SLAM3/Vocabulary/ORBvoc.txt"
@@ -20,8 +21,10 @@
 using namespace std;
 using namespace cv;
 
-const int cell_size = 1000;
+const int cell_size = 800;
 atomic<unsigned long long> atomic_cnts[2][cell_size][cell_size]; // 0:visited, 1:occupied
+bool visited[cell_size][cell_size];
+vector<pair<int, int>> history;
 
 bool check_boundary(int r, int c)
 {
@@ -31,7 +34,8 @@ bool check_boundary(int r, int c)
 }
 void bresenham(int r1, int c1, int r2, int c2)
 {
-    atomic_cnts[1][r2][c2].fetch_add(1);
+    if (check_boundary(r2, c2))
+        atomic_cnts[1][r2][c2].fetch_add(1);
     if (c1 == c2)
     {
         if (r1 > r2)
@@ -39,6 +43,13 @@ void bresenham(int r1, int c1, int r2, int c2)
 
         while (r1 <= r2)
         {
+            if (!check_boundary(r1, c1))
+                break;
+            if (!visited[r1][c1])
+            {
+                visited[r1][c1] = 1;
+                history.push_back({r1, c1});
+            }
             atomic_cnts[0][r1][c1].fetch_add(1);
             r1++;
         }
@@ -54,6 +65,13 @@ void bresenham(int r1, int c1, int r2, int c2)
         {
             while (c1 <= c2)
             {
+                if (!check_boundary(r1, c1))
+                    break;
+                if (!visited[r1][c1])
+                {
+                    visited[r1][c1] = 1;
+                    history.push_back({r1, c1});
+                }
                 atomic_cnts[0][r1][c1].fetch_add(1);
                 c1++;
             }
@@ -73,12 +91,17 @@ void bresenham(int r1, int c1, int r2, int c2)
                     int p = 2 * dr - dc;
                     while (c1 <= c2)
                     {
+                        if (!check_boundary(r0 - (r1 - r0), c1))
+                            break;
+                        if (!visited[r0 - (r1 - r0)][c1])
+                        {
+                            visited[r0 - (r1 - r0)][c1] = 1;
+                            history.push_back({r0 - (r1 - r0), c1});
+                        }
                         atomic_cnts[0][r0 - (r1 - r0)][c1].fetch_add(1);
                         c1++;
                         if (p < 0)
-                        {
                             p = p + 2 * dr;
-                        }
                         else
                         {
                             p = p + 2 * dr - 2 * dc;
@@ -95,12 +118,17 @@ void bresenham(int r1, int c1, int r2, int c2)
                     int c0 = c1;
                     while (c1 <= c2)
                     {
+                        if (!check_boundary(c0 - (c1 - c0), r1))
+                            break;
+                        if (!visited[c0 - (c1 - c0)][r1])
+                        {
+                            visited[c0 - (c1 - c0)][r1] = 1;
+                            history.push_back({c0 - (c1 - c0), r1});
+                        }
                         atomic_cnts[0][c0 - (c1 - c0)][r1].fetch_add(1);
                         c1++;
                         if (p < 0)
-                        {
                             p = p + 2 * dr;
-                        }
                         else
                         {
                             p = p + 2 * dr - 2 * dc;
@@ -119,12 +147,17 @@ void bresenham(int r1, int c1, int r2, int c2)
                     int p = 2 * dr - dc;
                     while (c1 <= c2)
                     {
+                        if (!check_boundary(r1, c1))
+                            break;
+                        if (!visited[r1][c1])
+                        {
+                            visited[r1][c1] = 1;
+                            history.push_back({r1, c1});
+                        }
                         atomic_cnts[0][r1][c1].fetch_add(1);
                         c1++;
                         if (p < 0)
-                        {
                             p = p + 2 * dr;
-                        }
                         else
                         {
                             p = p + 2 * dr - 2 * dc;
@@ -140,12 +173,17 @@ void bresenham(int r1, int c1, int r2, int c2)
                     int p = 2 * dr - dc;
                     while (c1 <= c2)
                     {
+                        if (!check_boundary(c1, r1))
+                            break;
+                        if (!visited[c1][r1])
+                        {
+                            visited[c1][r1] = 1;
+                            history.push_back({c1, r1});
+                        }
                         atomic_cnts[0][c1][r1].fetch_add(1);
                         c1++;
                         if (p < 0)
-                        {
                             p = p + 2 * dr;
-                        }
                         else
                         {
                             p = p + 2 * dr - 2 * dc;
@@ -161,49 +199,62 @@ void bresenham(int r1, int c1, int r2, int c2)
 void drawOccupancyMap(Mat &canvas)
 {
 
-#pragma omp parallel for schedule(dynamic, 1) collapse(2)
-    for (int i = 0; i < cell_size; ++i)
+#pragma omp parallel for schedule(dynamic, 1)
+    for (const auto pos : history)
     {
-        for (int j = 0; j < cell_size; ++j)
+        const int i = pos.first;
+        const int j = pos.second;
+
+        if (atomic_cnts[0][i][j] < 5)
+            continue;
+
+        int visit_cnt = 0;
+        int occupy_cnt = 0;
+        for (int dr = -1; dr <= 1; ++dr)
         {
-            if (atomic_cnts[0][i][j] == 0)
-                continue;
-            const int prob = 100 - (atomic_cnts[1][i][j] * 100) / atomic_cnts[0][i][j]; // 비어있는 확률
-            if (prob < 10)
+            for (int dc = -1; dc <= 1; ++dc)
             {
-                circle(canvas, Point(j, i), 0, Scalar(0, 0, 0), 5);
+                if (!check_boundary(i + dr, j + dc))
+                    continue;
+                visit_cnt += atomic_cnts[0][i + dr][j + dc];
+                occupy_cnt += atomic_cnts[1][i + dr][j + dc];
             }
-            else if (prob > 90)
-            {
-                //circle(canvas, Point(j, i), 0, Scalar(255, 255, 255));
-            }
+        }
+
+        const int prob = 100 - (occupy_cnt * 100) / visit_cnt; // 비어있는 확률
+        if (prob < 80)
+        {
+            circle(canvas, Point(j, i), 0, Scalar(0, 0, 0), 3);
+        }
+        else if (prob > 80)
+        {
+            circle(canvas, Point(j, i), 0, Scalar(255, 255, 255));
         }
     }
 }
 
-bool flag[2] = {1, 1};
+bool flag = 1;
 Sophus::Vector3f now;
 void foo(ORB_SLAM3::System &SLAM)
 {
     Mat canvas(cell_size, cell_size, CV_8UC3, cv::Scalar(120, 120, 120)); // Creating a blank canvas
     const float res = 0.01;                                               // 0.01 m/cell
+    history.reserve(100000);
 
-    while (flag[0])
+    while (flag)
     {
-        canvas.setTo(cv::Scalar(120, 120, 120));
-
-        if (SLAM.isLost() || SLAM.MapChanged())
+#pragma omp parallel for schedule(dynamic, 1)
+        for (const auto pos : history)
         {
-#pragma omp parallel for schedule(dynamic, 1) collapse(2)
-            for (int i = 0; i < cell_size; ++i)
-            {
-                for (int j = 0; j < cell_size; ++j)
-                {
-                    atomic_cnts[0][i][j].store(0);
-                    atomic_cnts[1][i][j].store(0);
-                }
-            }
+            const int i = pos.first;
+            const int j = pos.second;
+            atomic_cnts[0][i][j].store(0);
+            atomic_cnts[1][i][j].store(0);
         }
+
+        canvas.setTo(cv::Scalar(120, 120, 120));
+        memset(visited, 0, sizeof(visited));
+        history.clear();
 
         const auto mps = SLAM.mpAtlas->GetAllMapPoints();
         int mps_len = mps.size();
@@ -212,79 +263,28 @@ void foo(ORB_SLAM3::System &SLAM)
         for (int i = 0; i < mps_len; ++i)
         {
             const auto p = mps[i]->GetWorldPos();
-            const int c = cell_size / 2 + (int)(p(0) / res);  // x
-            const int r = cell_size / 2 - (int)(-p(2) / res); // y
+            const int c = cell_size / 2 + (int)(p(0) / res); // x
+            const int r = cell_size / 2 - (int)(p(2) / res); // y
 
             const auto p0 = mps[i]->GetReferenceKeyFrame()->GetPose().inverse().translation();
-            const int c0 = cell_size / 2 + (int)(p0(0) / res);  // x
-            const int r0 = cell_size / 2 - (int)(-p0(2) / res); // y
-
-            if (!check_boundary(r0, c0) || !check_boundary(r, c))
-                continue;
+            const int c0 = cell_size / 2 + (int)(p0(0) / res); // x
+            const int r0 = cell_size / 2 - (int)(p0(2) / res); // y
 
             bresenham(r0, c0, r, c);
         }
 
         drawOccupancyMap(canvas);
 
-        const int c = cell_size / 2 + (int)(now(0) / res);  // x
-        const int r = cell_size / 2 - (int)(-now(2) / res); // y
-        circle(canvas, Point(c, r), 0, cv::Scalar(0, 0, 255), 12);
-
-        // for (int i = 0; i < kfs_len; ++i)
-        // {
-        //     const auto p0 = kfs[i]->GetPose().translation();
-        //     cout << p0.transpose() << endl;
-        // }
+        const int c = cell_size / 2 + (int)(now(0) / res); // x
+        const int r = cell_size / 2 - (int)(now(2) / res); // y
+        if (check_boundary(r, c))
+            circle(canvas, Point(c, r), 0, cv::Scalar(0, 0, 255), 10);
 
         imshow("Canvas", canvas);
         waitKey(1);
 
         usleep(100 * 1000);
     }
-
-    //         const auto kfs = SLAM.mpAtlas->GetAllKeyFrames();
-    //         int kfs_len = kfs.size();
-
-    // #pragma omp parallel for schedule(dynamic, 1) collapse(2)
-    //         for (int i = 0; i < kfs_len; ++i)
-    //         {
-    //             const auto p0 = kfs[i]->GetOw();
-    //             const int x0 = (int)(p0(0) / res) + cell_size / 2;
-    //             const int y0 = (int)(-p0(2) / res) + cell_size / 2;
-    //             for (const auto mp : kfs[i]->GetMapPoints())
-    //             {
-    //                 const auto p = mp->GetWorldPos();
-    //                 const int x = (int)(p(0) / res) + cell_size / 2;
-    //                 const int y = (int)(-p(2) / res) + cell_size / 2;
-
-    //                 // const Point startPoints(x0, y0);
-    //                 // const Point endPoints(x, y);
-    //                 // line(canvas, startPoints, endPoints, Scalar(255, 255, 255), 1);
-    //                 if (!check_boundary(x0, y0) || !check_boundary(x, y))
-    //                     continue;
-    //                 bresenham(x0, y0, x, y);
-    //             }
-    //         }
-
-    //         drawOccupancyMap(canvas);
-
-    //         const int x = (int)(now(0) / res) + cell_size / 2;
-    //         const int y = (int)(-now(2) / res) + cell_size / 2;
-    //         circle(canvas, Point(x, y), 0, cv::Scalar(0, 0, 255), 15);
-    //         cout << "(" << y << "," << x << ")\n";
-
-    //         // for (int i = 0; i < kfs_len; ++i)
-    //         // {
-    //         //     const auto p0 = kfs[i]->GetPose().translation();
-    //         //     cout << p0.transpose() << endl;
-    //         // }
-
-    //         imshow("Canvas", canvas);
-    //         waitKey(1);
-
-    //         usleep(100 * 1000);
-    //     }
 }
 
 int main()
@@ -346,7 +346,7 @@ int main()
 
     thread thPoints(foo, ref(SLAM));
 
-    for (int i = 0;;)
+    for (;;)
     {
         struct HEADER
         {
@@ -385,13 +385,11 @@ int main()
 
         // const auto t1 = chrono::steady_clock::now();
         now = SLAM.TrackMonocular(image, (double)tmp.stamp * 1e-9).inverse().translation(); // TODO change to monocular_inertial
-        // SLAM.TrackMonocular(image, tmp.stamp); // TODO change to monocular_inertial
         // const auto t2 = chrono::steady_clock::now();
         // auto dt = chrono::duration_cast<chrono::milliseconds>(t2 - t1).count();
         // cout << "Elapsed time in milliseconds: " << dt << "ms\n";
     }
-    flag[0] = 0;
-    flag[1] = 0;
+    flag = 0;
     thPoints.join();
     close(new_socket);
     close(server_fd);
