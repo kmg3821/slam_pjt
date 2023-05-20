@@ -185,8 +185,8 @@ void drawOccupancyMap(Mat &canvas)
             }
             if(visit_cnt < 5) continue;
 
-            const int prob = (occupy_cnt * 100) / visit_cnt;
-            if (prob > 20)
+            const int percent = (occupy_cnt * 100) / visit_cnt;
+            if (percent >= 15)
             {
                 circle(canvas, Point(j, i), 0, Scalar(0, 0, 0), 3);
             }
