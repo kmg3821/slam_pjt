@@ -29,78 +29,128 @@ bool check_boundary(int r, int c)
         return false;
     return true;
 }
-
-void bresenham(int x1, int y1, int x2, int y2)
+void bresenham(int r1, int c1, int r2, int c2)
 {
-    atomic_cnts[1][y2][x2].fetch_add(1);
-    if (x1 == x2)
+    atomic_cnts[1][r2][c2].fetch_add(1);
+    if (c1 == c2)
     {
-        if (y1 > y2)
-            swap(y1, y2);
+        if (r1 > r2)
+            swap(r1, r2);
 
-        while (y1 <= y2)
+        while (r1 <= r2)
         {
-            atomic_cnts[0][y1][x1].fetch_add(1);
-            y1++;
+            atomic_cnts[0][r1][c1].fetch_add(1);
+            r1++;
         }
     }
     else
     {
-        if (x1 > x2)
+        if (c1 > c2)
         {
-            swap(x1, x2);
-            swap(y1, y2);
+            swap(c1, c2);
+            swap(r1, r2);
         }
-        if (y1 == y2)
+        if (r1 == r2)
         {
-            while (x1 <= x2)
+            while (c1 <= c2)
             {
-                atomic_cnts[0][y1][x1].fetch_add(1);
-                x1++;
+                atomic_cnts[0][r1][c1].fetch_add(1);
+                c1++;
             }
         }
         else
         {
-            if (y1 > y2)
+            if (r1 > r2)
             {
-                int y0 = y1;
-                y2 = y1 + (y1 - y2);
+                r2 = r1 + (r1 - r2);
 
-                int dx = x2 - x1;
-                int dy = y2 - y1;
-                int p = 2 * dy - dx;
-                while (x1 <= x2)
+                int dr = r2 - r1;
+                int dc = c2 - c1;
+
+                if (dr <= dc)
                 {
-                    atomic_cnts[0][y0 - (y1 - y0)][x1].fetch_add(1);
-                    x1++;
-                    if (p < 0)
+                    int r0 = r1;
+                    int p = 2 * dr - dc;
+                    while (c1 <= c2)
                     {
-                        p = p + 2 * dy;
+                        atomic_cnts[0][r0 - (r1 - r0)][c1].fetch_add(1);
+                        c1++;
+                        if (p < 0)
+                        {
+                            p = p + 2 * dr;
+                        }
+                        else
+                        {
+                            p = p + 2 * dr - 2 * dc;
+                            r1++;
+                        }
                     }
-                    else
+                }
+                else
+                {
+                    swap(dr, dc);
+                    swap(c1, r1);
+                    swap(c2, r2);
+                    int p = 2 * dr - dc;
+                    int c0 = c1;
+                    while (c1 <= c2)
                     {
-                        p = p + 2 * dy - 2 * dx;
-                        y1++;
+                        atomic_cnts[0][c0 - (c1 - c0)][r1].fetch_add(1);
+                        c1++;
+                        if (p < 0)
+                        {
+                            p = p + 2 * dr;
+                        }
+                        else
+                        {
+                            p = p + 2 * dr - 2 * dc;
+                            r1++;
+                        }
                     }
                 }
             }
             else
             {
-                int dx = x2 - x1;
-                int dy = y2 - y1;
-                int p = 2 * dy - dx;
-                while (x1 <= x2)
+                int dr = r2 - r1;
+                int dc = c2 - c1;
+
+                if (dc >= dr)
                 {
-                    atomic_cnts[0][y1][x1].fetch_add(1);
-                    x1++;
-                    if (p < 0)
+                    int p = 2 * dr - dc;
+                    while (c1 <= c2)
                     {
-                        p = p + 2 * dy;
+                        atomic_cnts[0][r1][c1].fetch_add(1);
+                        c1++;
+                        if (p < 0)
+                        {
+                            p = p + 2 * dr;
+                        }
+                        else
+                        {
+                            p = p + 2 * dr - 2 * dc;
+                            r1++;
+                        }
                     }
-                    else
+                }
+                else
+                {
+                    swap(dr, dc);
+                    swap(c1, r1);
+                    swap(c2, r2);
+                    int p = 2 * dr - dc;
+                    while (c1 <= c2)
                     {
-                        p = p + 2 * dy - 2 * dx;
-                        y1++;
+                        atomic_cnts[0][c1][r1].fetch_add(1);
+                        c1++;
+                        if (p < 0)
+                        {
+                            p = p + 2 * dr;
+                        }
+                        else
+                        {
+                            p = p + 2 * dr - 2 * dc;
+                            r1++;
+                        }
                     }
                 }
             }
@@ -119,13 +169,13 @@ void drawOccupancyMap(Mat &canvas)
             if (atomic_cnts[0][i][j] == 0)
                 continue;
             const int prob = 100 - (atomic_cnts[1][i][j] * 100) / atomic_cnts[0][i][j]; // 비어있는 확률
-            if (prob < 20)
+            if (prob < 10)
             {
                 circle(canvas, Point(j, i), 0, Scalar(0, 0, 0), 5);
             }
-            else if (prob > 80)
+            else if (prob > 90)
             {
-                circle(canvas, Point(j, i), 0, Scalar(255, 255, 255));
+                //circle(canvas, Point(j, i), 0, Scalar(255, 255, 255));
             }
         }
     }
@@ -136,7 +186,7 @@ Sophus::Vector3f now;
 void foo(ORB_SLAM3::System &SLAM)
 {
     Mat canvas(cell_size, cell_size, CV_8UC3, cv::Scalar(120, 120, 120)); // Creating a blank canvas
-    const float res = 0.01;                                               // 0.005 m/cell
+    const float res = 0.01;                                               // 0.01 m/cell
 
     while (flag[0])
     {
@@ -155,37 +205,31 @@ void foo(ORB_SLAM3::System &SLAM)
             }
         }
 
-        const auto kfs = SLAM.mpAtlas->GetAllKeyFrames();
-        SLAM.GetTrackedMapPoints()
-        int kfs_len = kfs.size();
+        const auto mps = SLAM.mpAtlas->GetAllMapPoints();
+        int mps_len = mps.size();
 
-#pragma omp parallel for schedule(dynamic, 1) collapse(2)
-        for (int i = 0; i < kfs_len; ++i)
+#pragma omp parallel for schedule(dynamic, 1)
+        for (int i = 0; i < mps_len; ++i)
         {
-            const auto p0 = kfs[i]->GetOw();
-            const int x0 = (int)(p0(0) / res) + cell_size / 2;
-            const int y0 = (int)(-p0(2) / res) + cell_size / 2;
-            for (const auto mp : kfs[i]->GetMapPoints())
-            {
-                const auto p = mp->GetWorldPos();
-                const int x = (int)(p(0) / res) + cell_size / 2;
-                const int y = (int)(-p(2) / res) + cell_size / 2;
+            const auto p = mps[i]->GetWorldPos();
+            const int c = cell_size / 2 + (int)(p(0) / res);  // x
+            const int r = cell_size / 2 - (int)(-p(2) / res); // y
 
-                // const Point startPoints(x0, y0);
-                // const Point endPoints(x, y);
-                // line(canvas, startPoints, endPoints, Scalar(255, 255, 255), 1);
-                if (!check_boundary(x0, y0) || !check_boundary(x, y))
-                    continue;
-                bresenham(x0, y0, x, y);
-            }
+            const auto p0 = mps[i]->GetReferenceKeyFrame()->GetPose().inverse().translation();
+            const int c0 = cell_size / 2 + (int)(p0(0) / res);  // x
+            const int r0 = cell_size / 2 - (int)(-p0(2) / res); // y
+
+            if (!check_boundary(r0, c0) || !check_boundary(r, c))
+                continue;
+
+            bresenham(r0, c0, r, c);
         }
 
         drawOccupancyMap(canvas);
 
-        const int x = (int)(now(0) / res) + cell_size / 2;
-        const int y = (int)(-now(2) / res) + cell_size / 2;
-        circle(canvas, Point(x, y), 0, cv::Scalar(0, 0, 255), 15);
-        cout << "(" << y << "," << x << ")\n";
+        const int c = cell_size / 2 + (int)(now(0) / res);  // x
+        const int r = cell_size / 2 - (int)(-now(2) / res); // y
+        circle(canvas, Point(c, r), 0, cv::Scalar(0, 0, 255), 12);
 
         // for (int i = 0; i < kfs_len; ++i)
         // {
@@ -198,6 +242,49 @@ void foo(ORB_SLAM3::System &SLAM)
 
         usleep(100 * 1000);
     }
+
+    //         const auto kfs = SLAM.mpAtlas->GetAllKeyFrames();
+    //         int kfs_len = kfs.size();
+
+    // #pragma omp parallel for schedule(dynamic, 1) collapse(2)
+    //         for (int i = 0; i < kfs_len; ++i)
+    //         {
+    //             const auto p0 = kfs[i]->GetOw();
+    //             const int x0 = (int)(p0(0) / res) + cell_size / 2;
+    //             const int y0 = (int)(-p0(2) / res) + cell_size / 2;
+    //             for (const auto mp : kfs[i]->GetMapPoints())
+    //             {
+    //                 const auto p = mp->GetWorldPos();
+    //                 const int x = (int)(p(0) / res) + cell_size / 2;
+    //                 const int y = (int)(-p(2) / res) + cell_size / 2;
+
+    //                 // const Point startPoints(x0, y0);
+    //                 // const Point endPoints(x, y);
+    //                 // line(canvas, startPoints, endPoints, Scalar(255, 255, 255), 1);
+    //                 if (!check_boundary(x0, y0) || !check_boundary(x, y))
+    //                     continue;
+    //                 bresenham(x0, y0, x, y);
+    //             }
+    //         }
+
+    //         drawOccupancyMap(canvas);
+
+    //         const int x = (int)(now(0) / res) + cell_size / 2;
+    //         const int y = (int)(-now(2) / res) + cell_size / 2;
+    //         circle(canvas, Point(x, y), 0, cv::Scalar(0, 0, 255), 15);
+    //         cout << "(" << y << "," << x << ")\n";
+
+    //         // for (int i = 0; i < kfs_len; ++i)
+    //         // {
+    //         //     const auto p0 = kfs[i]->GetPose().translation();
+    //         //     cout << p0.transpose() << endl;
+    //         // }
+
+    //         imshow("Canvas", canvas);
+    //         waitKey(1);
+
+    //         usleep(100 * 1000);
+    //     }
 }
 
 int main()
