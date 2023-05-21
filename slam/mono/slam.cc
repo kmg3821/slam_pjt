@@ -22,7 +22,7 @@ using json = nlohmann::json;
 const int cell_size = 800;
 atomic<unsigned long long> atomic_cnts[2][cell_size][cell_size]; // 0:visited, 1:occupied
 bool flag = 1;
-Sophus::Vector3f now;
+Sophus::SE3f now;
 bool check_boundary(int r, int c);
 void bresenham(int r1, int c1, int r2, int c2);
 void drawOccupancyMap(Mat &canvas);
@@ -64,7 +64,7 @@ int main()
         }
 
         // const auto t1 = chrono::steady_clock::now();
-        now = SLAM.TrackMonocular(image, (double)stamp * 1e-9).inverse().translation(); // TODO change to monocular_inertial
+        now = SLAM.TrackMonocular(image, (double)stamp * 1e-9).inverse();
         // const auto t2 = chrono::steady_clock::now();
         // auto dt = chrono::duration_cast<chrono::milliseconds>(t2 - t1).count();
         // cout << "Elapsed time in milliseconds: " << dt << "ms\n";
@@ -292,10 +292,18 @@ void occupancy_grid(ORB_SLAM3::System &SLAM)
 
         drawOccupancyMap(canvas);
 
-        const int c = cell_size / 2 + (int)(now(0) / res); // x
-        const int r = cell_size / 2 - (int)(now(2) / res); // y
+        const Sophus::Vector3f trans = now.translation();
+        const Sophus::Vector3f dir = now.rotationMatrix().col(2);
+        const int c = cell_size / 2 + (int)(trans(0) / res); // x
+        const int r = cell_size / 2 - (int)(trans(2) / res); // y
+        const int ratio[2] = {(int)(dir(0) / res), -(int)(dir(2) / res)}; // y
+        const int dc = (20*ratio[0]) / (abs(ratio[0]) + abs(ratio[1]));
+        const int dr = (20*ratio[1]) / (abs(ratio[0]) + abs(ratio[1]));
         if (check_boundary(r, c))
-            circle(canvas, Point(c, r), 0, cv::Scalar(0, 0, 255), 10);
+        {
+            circle(canvas, Point(c, r), 0, Scalar(0, 0, 255), 10);
+            arrowedLine(canvas, Point(c,r), Point(c + dc, r + dr), Scalar(0,0,255),2, LINE_8, 0, 0.5);
+        }
 
         imshow("Canvas", canvas);
         waitKey(1);
