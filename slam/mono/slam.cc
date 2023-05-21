@@ -1,28 +1,28 @@
 
 #include <iostream>
-#include <sys/socket.h>
-#include <arpa/inet.h>
 #include <unistd.h>
-#include <opencv2/opencv.hpp>
-#include <string.h>
-#include <sys/ioctl.h>
+#include <string>
 #include <chrono>
 #include <System.h>
 
+#include <opencv2/opencv.hpp>
 #include <omp.h>
 #include <atomic>
 #include <thread>
+#include <mqtt/async_client.h>
+#include <nlohmann/json.hpp>
 
-#define PORT 8080
 #define VOCA_PATH "/home/kmg/ORB_SLAM3/Vocabulary/ORBvoc.txt"
-#define CAM_INTRINSIC "/home/kmg/slam_pjt/slam/cam_intrinsic.yaml"
+#define CAM_INTRINSIC "./cam_intrinsic.yaml"
 
 using namespace std;
 using namespace cv;
+using json = nlohmann::json;
 
 const int cell_size = 800;
 atomic<unsigned long long> atomic_cnts[2][cell_size][cell_size]; // 0:visited, 1:occupied
-
+bool flag = 1;
+Sophus::Vector3f now;
 bool check_boundary(int r, int c);
 void bresenham(int r1, int c1, int r2, int c2);
 void drawOccupancyMap(Mat &canvas);
@@ -32,92 +32,31 @@ int main()
 {
     ORB_SLAM3::System SLAM(VOCA_PATH, CAM_INTRINSIC, ORB_SLAM3::System::MONOCULAR, true);
 
-    int server_fd, new_socket;
-    struct sockaddr_in address;
-    const int opt = 1;
-    const int addrlen = sizeof(address);
+    const string server_address = "tcp://192.168.219.157:1883";
+    const string client_id = "kmg_sub";
+    const string topic = "img";
+    const int qos = 1;
 
-    // create socket file descriptor
-    if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0)
-    {
-        perror("socket failed");
-        return EXIT_FAILURE;
-    }
+    mqtt::async_client cli(server_address, client_id);
+    mqtt::connect_options conn_opts;
+    conn_opts.set_keep_alive_interval(20);
+    conn_opts.set_clean_session(true);
 
-    // set socket options
-    if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt)))
-    {
-        perror("setsockopt failed");
-        return EXIT_FAILURE;
-    }
-
-    // set socket receive buffer
-    const int buf_size = 200000 * 1000;
-    if (setsockopt(server_fd, SOL_SOCKET, SO_RCVBUF, &buf_size, sizeof(buf_size)))
-    {
-        perror("setsockopt failed");
-        return EXIT_FAILURE;
-    }
-
-    // set server address
-    address.sin_family = AF_INET;
-    address.sin_addr.s_addr = INADDR_ANY;
-    address.sin_port = htons(PORT);
-
-    // bind socket to address
-    if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0)
-    {
-        perror("bind failed");
-        return EXIT_FAILURE;
-    }
-
-    // listen for incoming connections
-    if (listen(server_fd, 3) < 0)
-    {
-        perror("listen failed");
-        return EXIT_FAILURE;
-    }
-
-    // accept incoming connection
-    if ((new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t *)&addrlen)) < 0)
-    {
-        perror("accept failed");
-        return EXIT_FAILURE;
-    }
+    cli.connect(conn_opts)->wait();
+    cli.subscribe(topic, qos)->wait();
+    cli.start_consuming();
 
     thread thPoints(occupancy_grid, ref(SLAM));
 
     for (;;)
     {
-        struct HEADER
-        {
-            int img_size;
-            uint64_t stamp;
-        } tmp;
-
-        int bytes_available = 0;
-        while (bytes_available < sizeof(tmp))
-            ioctl(new_socket, FIONREAD, &bytes_available);
-        if (read(new_socket, &tmp, sizeof(tmp)) <= 0)
-        {
-            perror("read failed");
-            break;
-        }
-        // cout << tmp.img_size << '\n';
-
-        bytes_available = 0;
-        while (bytes_available < tmp.img_size)
-            ioctl(new_socket, FIONREAD, &bytes_available);
-
-        vector<uchar> data(tmp.img_size);
-        if (read(new_socket, data.data(), tmp.img_size) <= 0)
-        {
-            perror("read failed");
-            break;
-        }
+        const mqtt::const_message_ptr msg_ptr = cli.consume_message();
+        const json msg = json::parse(msg_ptr->to_string());
+        const vector<uchar> buffer(msg["image"].begin(), msg["image"].end());
+        const uint64_t stamp = stoull(to_string(msg["stamp"]));
 
         // decode image data
-        Mat image = imdecode(data, IMREAD_COLOR);
+        Mat image = imdecode(buffer, IMREAD_COLOR);
         if (image.empty())
         {
             cerr << "Failed to decode image." << endl;
@@ -125,21 +64,18 @@ int main()
         }
 
         // const auto t1 = chrono::steady_clock::now();
-        now = SLAM.TrackMonocular(image, (double)tmp.stamp * 1e-9).inverse().translation(); // TODO change to monocular_inertial
+        now = SLAM.TrackMonocular(image, (double)stamp * 1e-9).inverse().translation(); // TODO change to monocular_inertial
         // const auto t2 = chrono::steady_clock::now();
         // auto dt = chrono::duration_cast<chrono::milliseconds>(t2 - t1).count();
         // cout << "Elapsed time in milliseconds: " << dt << "ms\n";
     }
     flag = 0;
     thPoints.join();
-    close(new_socket);
-    close(server_fd);
-
+    cli.disconnect();
     SLAM.Shutdown();
 
     return EXIT_SUCCESS;
 }
-
 
 bool check_boundary(int r, int c)
 {
@@ -282,7 +218,6 @@ void bresenham(int r1, int c1, int r2, int c2)
     }
 }
 
-
 void drawOccupancyMap(Mat &canvas)
 {
 
@@ -303,7 +238,8 @@ void drawOccupancyMap(Mat &canvas)
                     occupy_cnt += atomic_cnts[1][i + dr][j + dc];
                 }
             }
-            if(visit_cnt < 5) continue;
+            if (visit_cnt < 5)
+                continue;
 
             const int percent = (occupy_cnt * 100) / visit_cnt;
             if (percent >= 15)
@@ -318,8 +254,6 @@ void drawOccupancyMap(Mat &canvas)
     }
 }
 
-bool flag = 1;
-Sophus::Vector3f now;
 void occupancy_grid(ORB_SLAM3::System &SLAM)
 {
     Mat canvas(cell_size, cell_size, CV_8UC3, cv::Scalar(120, 120, 120)); // Creating a blank canvas

@@ -18,6 +18,8 @@
                 "-lopencv_imgcodecs",
                 "-lopencv_videoio",
                 "-lopencv_highgui",
+                "-lpaho-mqttpp3",
+                "-lpaho-mqtt3as"
             ],
             "options": {
                 "cwd": "${fileDirname}"

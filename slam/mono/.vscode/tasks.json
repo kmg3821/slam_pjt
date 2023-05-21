@@ -38,6 +38,8 @@
                 "-lboost_serialization",
                 "-lcrypto",
                 "-lORB_SLAM3",
+                "-lpaho-mqttpp3",
+                "-lpaho-mqtt3as",
                 "-DCOMPILEDWITHC11 -DHAVE_EIGEN -DHAVE_GLEW -DHAVE_PYTHON -DPANGO_DEFAULT_WIN_URI=\"wayland\" -D_LINUX_",
             ],
             "options": {
