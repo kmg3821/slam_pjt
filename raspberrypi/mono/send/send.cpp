@@ -75,7 +75,7 @@ int main()
     bool flag = 0;
     vector<uchar> buffer;
     uchar header[12];
-    for (int cnt = 0;;cnt++)
+    for (;;)
     {
     	Mat frame;
         cap.read(frame);
@@ -107,9 +107,7 @@ int main()
 	
 	try{
 	    mqtt::token_ptr tok = topic.publish(string(buffer.begin(), buffer.end()));
-	    if(cnt % 10 == 0){
-	        tok->wait();
-	    }
+	    tok->wait();
 	}
 	catch(const mqtt::exception& exc){
 		cerr << "Failed to send image data." << endl;
