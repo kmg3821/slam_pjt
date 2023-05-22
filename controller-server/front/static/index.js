@@ -27,12 +27,13 @@ const getImage = async function(){
 		ok = false;
 	});
 	if(ok){
-		const image    = axios.get(backend + imageUrl);
+		const image = await axios.get(backend + imageUrl);
 		imagePlaceholder.style.backgroundImage = `url('${image}')`;
 	}
+	setTimeout(getImage, "100");
 }
 
-setInterval(getImage, 100);
+getImage();
 
 eventList = [[topButton, "top"], [downButton, "bottom"], [leftButton, "left"], [rightButton, "right"]];
 
