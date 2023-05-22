@@ -15,13 +15,15 @@
 
 #define PORT 8080
 #define VOCA_PATH "/home/kmg/ORB_SLAM3/Vocabulary/ORBvoc.txt"
-#define CAM_INTRINSIC "/home/kmg/slam_pjt/slam/cam_intrinsic.yaml"
+#define CAM_INTRINSIC "./cam_intrinsic.yaml"
 
 using namespace std;
 using namespace cv;
 
 const int cell_size = 800;
 atomic<unsigned long long> atomic_cnts[2][cell_size][cell_size]; // 0:visited, 1:occupied
+bool flag = 1;
+Sophus::Vector3f now;
 
 bool check_boundary(int r, int c);
 void bresenham(int r1, int c1, int r2, int c2);
@@ -318,8 +320,6 @@ void drawOccupancyMap(Mat &canvas)
     }
 }
 
-bool flag = 1;
-Sophus::Vector3f now;
 void occupancy_grid(ORB_SLAM3::System &SLAM)
 {
     Mat canvas(cell_size, cell_size, CV_8UC3, cv::Scalar(120, 120, 120)); // Creating a blank canvas
