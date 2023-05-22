@@ -52,6 +52,10 @@ app.listen(backend_port, ()=>{
 client.on("connect", () => {
 	console.log("MQTT Client connected to port 1883");
 	client.subscribe('img', {qos:0});
+	const imageDir = './image'
+	if(!fs.existsSync(imageDir)){
+	    fs.mkdirSync(imageDir);
+	}
 });
 
 client.on("error", (error)=> {
