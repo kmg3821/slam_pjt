@@ -79,7 +79,7 @@ client.on('message', (topic, message, packet)=>{
 					console.log(err);
 				}
 			});
-			console.log(`Image received: ${imageSrc}`); 
+			//console.log(`Image received: ${imageSrc}`); 
 			done();
 		});
 	}
