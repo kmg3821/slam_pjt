@@ -1,37 +1,56 @@
 // compile option
-// g++ -std=c++14 -O2 ./send.cpp -o ./send -L/usr/local/include/opencv2/ -lopencv_videoio -lopencv_core -lopencv_imgcodecs -lpaho-mqttpp3 -lpaho-mqtt3as
+// g++ -std=c++14 -O2 ./send_old.cpp -o ./send_old -L/usr/local/include/opencv2/ -lopencv_videoio -lopencv_core -lopencv_imgcodecs
 
 #include <iostream>
 #include <algorithm>
 #include <cstring>
 #include <cstdlib>
+#include <arpa/inet.h>
+#include <sys/socket.h>
 #include <unistd.h>
-#include <fcntl.h>
-#include <sys/ioctl.h>
-#include <linux/i2c-dev.h>
-
 #include <opencv2/opencv.hpp>
+
 #include <opencv2/core.hpp>
 #include <opencv2/videoio/videoio_c.h>
 #include <opencv2/videoio.hpp>
 #include <opencv2/highgui.hpp>
 #include <chrono>
 
-#include <nlohmann/json.hpp>
-#include <mqtt/client.h>
+#include <fcntl.h>
+#include <sys/ioctl.h>
+#include <linux/i2c-dev.h>
+
+// #define IP_ADDRESS "192.168.219.161"
+// #define IP_ADDRESS "192.168.26.33"
+#define IP_ADDRESS "192.168.110.103"
+#define PORT 8080
 
 using namespace std;
 using namespace cv;
-using json = nlohmann::json;
 
 int main()
 {
-    const string client_address = "tcp://192.168.110.137:1883";
-    const string client_id = "kmg_pub";
+    // create a socket
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock == -1)
+    {
+        cerr << "Failed to create socket." << endl;
+        return EXIT_FAILURE;
+    }
 
-    mqtt::async_client cli(client_address, client_id);
-    cli.connect()->wait();
-    mqtt::topic topic(cli, "kmg_img");
+    // specify the address and port of the server to connect to
+    struct sockaddr_in server_address;
+    memset(&server_address, 0, sizeof(server_address));
+    server_address.sin_family = AF_INET;
+    server_address.sin_port = htons(PORT);
+    inet_pton(AF_INET, IP_ADDRESS, &server_address.sin_addr);
+
+    // connect to the server
+    if (connect(sock, (struct sockaddr *)&server_address, sizeof(server_address)) == -1)
+    {
+        cerr << "Failed to connect to server." << endl;
+        return EXIT_FAILURE;
+    }
 
     // send the images
     VideoCapture cap("/dev/video0");
@@ -67,7 +86,7 @@ int main()
         cap.read(frame);
         const auto tframe = chrono::high_resolution_clock::now().time_since_epoch().count();
 
-        struct __attribute__((__packed__)) HEADER
+        struct HEADER
         {
             int bufsz;
             uint64_t stamp;
@@ -87,14 +106,16 @@ int main()
         tmp.bufsz = buffer.size();
         tmp.stamp = tframe;
         buffer.insert(buffer.begin(), (uchar *)(&tmp), (uchar *)(&tmp) + sizeof(tmp));
-
-        mqtt::token_ptr tok = topic.publish(string(buffer.begin(), buffer.end()));
-        tok->wait();
-        
-        cout << buffer.size() << "\n";
+        const int bytes_sent = send(sock, buffer.data(), buffer.size(), 0);
+        if (bytes_sent == -1)
+        {
+            cerr << "Failed to send image data." << endl;
+            return EXIT_FAILURE;
+        }
     }
 
-    cli.disconnect();
+    // close the socket and video capture
+    close(sock);
     cap.release();
 
     return EXIT_SUCCESS;
