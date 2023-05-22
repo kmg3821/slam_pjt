@@ -51,7 +51,7 @@ app.listen(backend_port, ()=>{
 
 client.on("connect", () => {
 	console.log("MQTT Client connected to port 1883");
-	client.subscribe('img', {qos:2});
+	client.subscribe('img', {qos:0});
 });
 
 client.on("error", (error)=> {
@@ -60,6 +60,8 @@ client.on("error", (error)=> {
 
 client.on('message', (topic, message, packet)=>{
 	if (topic === 'img'){
+		//console.log(`image size is : ${message.readUInt32BE(0)}`);
+		//console.log(`timestamp  is : ${message.readBigUInt64BE(4)}`);
 		lock.acquire('file-io', (done)=>{
 			imageSrc = `image/received-${message.readBigUInt64BE(4)}.jpg`;
 			imageList.push(imageSrc);
