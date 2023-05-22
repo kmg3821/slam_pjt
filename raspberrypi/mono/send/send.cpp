@@ -2,6 +2,7 @@
 // g++ -std=c++14 -O2 ./send.cpp -o ./send -L/usr/local/include/opencv2/ -lopencv_videoio -lopencv_core -lopencv_imgcodecs -lpaho-mqttpp3 -lpaho-mqtt3as
 
 #include <iostream>
+#include <fstream>
 #include <algorithm>
 #include <cstring>
 #include <cstdlib>
@@ -17,21 +18,32 @@
 #include <opencv2/highgui.hpp>
 #include <chrono>
 
-#include <nlohmann/json.hpp>
 #include <mqtt/client.h>
 
 using namespace std;
 using namespace cv;
-using json = nlohmann::json;
 
 int main()
 {
-    const string client_address = "tcp://192.168.110.137:1883";
-    const string client_id = "kmg_pub";
-
+    ifstream configFile("config.txt");
+    string line;
+    string client_address;
+    string client_id="";
+    while(getline(configFile, line)) {
+    	if (line.substr(0, 11) == "IP_ADDRESS=") {
+		client_address = line.substr(11);
+	}
+	if (line.substr(0, 10) == "CLIENT_ID=") {
+		client_id = line.substr(10);
+	}
+    }
+    if(client_address == ""){
+    	cerr << "IP_ADDRESS NOT SET. Please write config.txt as format in config-stub.txt" << endl;
+	return EXIT_FAILURE;
+    }
     mqtt::async_client cli(client_address, client_id);
     cli.connect()->wait();
-    mqtt::topic topic(cli, "kmg_img");
+    mqtt::topic topic(cli, "img", 0);
 
     // send the images
     VideoCapture cap("/dev/video0");
@@ -63,35 +75,45 @@ int main()
     bool flag = 0;
     for (;;)
     {
-        Mat frame;
+    	Mat frame;
         cap.read(frame);
         const auto tframe = chrono::high_resolution_clock::now().time_since_epoch().count();
+        uint32_t bufsz;
+	uchar* cbufsz = (uchar*)&bufsz;
+        uint64_t stamp;
+	uchar* cstamp = (uchar*)&stamp;
 
-        struct __attribute__((__packed__)) HEADER
-        {
-            int bufsz;
-            uint64_t stamp;
-        } tmp;
-
-        // const auto tframe = chrono::duration_cast<chrono::nanoseconds>(t - t0).count();
-        // cout << tframe << " ms\n";
         if (frame.empty())
         {
             cerr << "ERROR! blank frame grabbed\n";
             break;
         }
-
-        vector<uchar> buffer;
-        buffer.reserve(200000);
+	vector<uchar> buffer;
+	buffer.reserve(200000);
         imencode(".jpg", frame, buffer);
-        tmp.bufsz = buffer.size();
-        tmp.stamp = tframe;
-        buffer.insert(buffer.begin(), (uchar *)(&tmp), (uchar *)(&tmp) + sizeof(tmp));
-
-        mqtt::token_ptr tok = topic.publish(string(buffer.begin(), buffer.end()));
-        tok->wait();
-        
-        cout << buffer.size() << "\n";
+        bufsz = buffer.size();
+        stamp = tframe;
+	for(int i = 0;i < 2;i++){
+	    uchar buf = cbufsz[i];
+	    cbufsz[i] = cbufsz[3 - i];
+	    cbufsz[3 - i] = buf;
+	}
+	for(int i = 0;i < 4;i++){
+	    uchar buf = cstamp[i];
+	    cstamp[i] = cstamp[7 - i];
+	    cstamp[7-i] = buf;
+	}
+	buffer.insert(buffer.begin(), (uchar *)(&stamp), (uchar *)(&stamp) + sizeof(stamp));
+	buffer.insert(buffer.begin(), (uchar *)(&bufsz), (uchar *)(&bufsz) + sizeof(bufsz));
+	try{
+	    mqtt::token_ptr tok = topic.publish(string(buffer.begin(), buffer.end()));
+	    tok->wait();
+	}
+	catch(const mqtt::exception& exc){
+		cerr << "Failed to send image data." << endl;
+		cerr << exc << endl;
+		return EXIT_FAILURE;
+	}
     }
 
     cli.disconnect();
