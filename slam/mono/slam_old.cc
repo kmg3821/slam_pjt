@@ -1,28 +1,30 @@
 
 #include <iostream>
+#include <sys/socket.h>
+#include <arpa/inet.h>
 #include <unistd.h>
-#include <string>
+#include <opencv2/opencv.hpp>
+#include <string.h>
+#include <sys/ioctl.h>
 #include <chrono>
 #include <System.h>
 
-#include <opencv2/opencv.hpp>
 #include <omp.h>
 #include <atomic>
 #include <thread>
-#include <mqtt/async_client.h>
-#include <nlohmann/json.hpp>
 
+#define PORT 8080
 #define VOCA_PATH "/home/kmg/ORB_SLAM3/Vocabulary/ORBvoc.txt"
 #define CAM_INTRINSIC "./cam_intrinsic.yaml"
 
 using namespace std;
 using namespace cv;
-using json = nlohmann::json;
 
 const int cell_size = 800;
 atomic<unsigned long long> atomic_cnts[2][cell_size][cell_size]; // 0:visited, 1:occupied
-bool flag = 2;
-Sophus::SE3f now;
+bool flag = 1;
+Sophus::Vector3f now;
+
 bool check_boundary(int r, int c);
 void bresenham(int r1, int c1, int r2, int c2);
 void drawOccupancyMap(Mat &canvas);
@@ -32,38 +34,92 @@ int main()
 {
     ORB_SLAM3::System SLAM(VOCA_PATH, CAM_INTRINSIC, ORB_SLAM3::System::MONOCULAR, true);
 
-    const string server_address = "tcp://192.168.110.137:1883";
-    const string client_id = "kmg_sub";
-    const string topic = "kmg_img";
-    const int qos = 0;
+    int server_fd, new_socket;
+    struct sockaddr_in address;
+    const int opt = 1;
+    const int addrlen = sizeof(address);
 
-    mqtt::async_client cli(server_address, client_id);
-    mqtt::connect_options conn_opts;
-    // conn_opts.set_keep_alive_interval(20);
-    conn_opts.set_clean_session(true);
+    // create socket file descriptor
+    if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0)
+    {
+        perror("socket failed");
+        return EXIT_FAILURE;
+    }
 
-    cli.connect(conn_opts)->wait();
-    cli.subscribe(topic, qos)->wait();
-    cli.start_consuming();
+    // set socket options
+    if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt)))
+    {
+        perror("setsockopt failed");
+        return EXIT_FAILURE;
+    }
+
+    // set socket receive buffer
+    const int buf_size = 200000 * 1000;
+    if (setsockopt(server_fd, SOL_SOCKET, SO_RCVBUF, &buf_size, sizeof(buf_size)))
+    {
+        perror("setsockopt failed");
+        return EXIT_FAILURE;
+    }
+
+    // set server address
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = INADDR_ANY;
+    address.sin_port = htons(PORT);
+
+    // bind socket to address
+    if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0)
+    {
+        perror("bind failed");
+        return EXIT_FAILURE;
+    }
+
+    // listen for incoming connections
+    if (listen(server_fd, 3) < 0)
+    {
+        perror("listen failed");
+        return EXIT_FAILURE;
+    }
+
+    // accept incoming connection
+    if ((new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t *)&addrlen)) < 0)
+    {
+        perror("accept failed");
+        return EXIT_FAILURE;
+    }
 
     thread thPoints(occupancy_grid, ref(SLAM));
 
     for (;;)
     {
-        struct __attribute__((__packed__)) HEADER
+        struct HEADER
         {
             int img_size;
             uint64_t stamp;
         } tmp;
 
-        const mqtt::const_message_ptr msg_ptr = cli.consume_message();
-        const auto data = msg_ptr->to_string();
-        memcpy(&tmp, data.data(), sizeof(tmp));
-        const vector<uchar> buffer(data.begin() + sizeof(tmp), data.end());
-        const uint64_t stamp = tmp.stamp;
+        int bytes_available = 0;
+        while (bytes_available < sizeof(tmp))
+            ioctl(new_socket, FIONREAD, &bytes_available);
+        if (read(new_socket, &tmp, sizeof(tmp)) <= 0)
+        {
+            perror("read failed");
+            break;
+        }
+        // cout << tmp.img_size << '\n';
+
+        bytes_available = 0;
+        while (bytes_available < tmp.img_size)
+            ioctl(new_socket, FIONREAD, &bytes_available);
+
+        vector<uchar> data(tmp.img_size);
+        if (read(new_socket, data.data(), tmp.img_size) <= 0)
+        {
+            perror("read failed");
+            break;
+        }
 
         // decode image data
-        Mat image = imdecode(buffer, IMREAD_COLOR);
+        Mat image = imdecode(data, IMREAD_COLOR);
         if (image.empty())
         {
             cerr << "Failed to decode image." << endl;
@@ -71,18 +127,21 @@ int main()
         }
 
         // const auto t1 = chrono::steady_clock::now();
-        now = SLAM.TrackMonocular(image, (double)stamp * 1e-9).inverse();
+        now = SLAM.TrackMonocular(image, (double)tmp.stamp * 1e-9).inverse().translation(); // TODO change to monocular_inertial
         // const auto t2 = chrono::steady_clock::now();
         // auto dt = chrono::duration_cast<chrono::milliseconds>(t2 - t1).count();
         // cout << "Elapsed time in milliseconds: " << dt << "ms\n";
     }
     flag = 0;
     thPoints.join();
-    cli.disconnect();
+    close(new_socket);
+    close(server_fd);
+
     SLAM.Shutdown();
 
     return EXIT_SUCCESS;
 }
+
 
 bool check_boundary(int r, int c)
 {
@@ -225,6 +284,7 @@ void bresenham(int r1, int c1, int r2, int c2)
     }
 }
 
+
 void drawOccupancyMap(Mat &canvas)
 {
 
@@ -245,8 +305,7 @@ void drawOccupancyMap(Mat &canvas)
                     occupy_cnt += atomic_cnts[1][i + dr][j + dc];
                 }
             }
-            if (visit_cnt < 5)
-                continue;
+            if(visit_cnt < 5) continue;
 
             const int percent = (occupy_cnt * 100) / visit_cnt;
             if (percent >= 15)
@@ -299,18 +358,10 @@ void occupancy_grid(ORB_SLAM3::System &SLAM)
 
         drawOccupancyMap(canvas);
 
-        const Sophus::Vector3f trans = now.translation();
-        const Sophus::Vector3f dir = now.rotationMatrix().col(2);
-        const int c = cell_size / 2 + (int)(trans(0) / res); // x
-        const int r = cell_size / 2 - (int)(trans(2) / res); // y
-        const int ratio[2] = {(int)(dir(0) / res), -(int)(dir(2) / res)}; // y
-        const int dc = (20*ratio[0]) / (abs(ratio[0]) + abs(ratio[1]));
-        const int dr = (20*ratio[1]) / (abs(ratio[0]) + abs(ratio[1]));
+        const int c = cell_size / 2 + (int)(now(0) / res); // x
+        const int r = cell_size / 2 - (int)(now(2) / res); // y
         if (check_boundary(r, c))
-        {
-            circle(canvas, Point(c, r), 0, Scalar(0, 0, 255), 10);
-            arrowedLine(canvas, Point(c,r), Point(c + dc, r + dr), Scalar(0,0,255),2, LINE_8, 0, 0.5);
-        }
+            circle(canvas, Point(c, r), 0, cv::Scalar(0, 0, 255), 10);
 
         imshow("Canvas", canvas);
         waitKey(1);
