@@ -24,19 +24,19 @@ const client = mqtt.connect({
 
 app.get('/image/recent', (req, res)=>{
 	status_code = 100
-	json = {"status":"continue..."};
+	msg = {"status":"continue..."};
 	lock.acquire('file-io', (done)=>{
 		if (imageSrc === null){
 			status_code = 204;
-			json = {"status": "image not taken yet"};
+			msg = {"status": "image not taken yet"};
 		}
 		else{
 			status_code = 200;
-			json = {"status": "OK", "image":imageSrc}
+			msg = {"status": "OK", "image":imageSrc}
 		}
 		done();
 	})
-	return res.status(status_code).json(json);
+	return res.status(status_code).json(msg);
 });
 
 app.post("/event", (req, res)=>{
@@ -60,28 +60,24 @@ client.on("error", (error)=> {
 
 client.on('message', (topic, message, packet)=>{
 	if (topic === 'img'){
-		console.log(`Message received : topic=[${topic}]`);
-		console.log(`image size is : ${message.readUInt32BE(0)}`);
-		console.log(`timestamp  is : ${message.readBigUInt64BE(4)}`);
 		lock.acquire('file-io', (done)=>{
 			imageSrc = `image/received-${message.readBigUInt64BE(4)}.jpg`;
-			console.log(`imageSrc is : ${imageSrc}`);
-			imageList.push(imageSrc)
+			imageList.push(imageSrc);
 			if(imageList.length >= 10){
-				console.log(imageList[0]);
 				fs.unlink(imageList[0], (err)=>{
 					if(err){
-						console.error(err)
+						console.error(err);
 						return
 					}
 				})
-				imageList.shift()
+				imageList.shift();
 			}
 			fs.writeFile(imageSrc, message.slice(12), (err)=>{
 				if(err) {
 					console.log(err);
 				}
 			});
+			console.log(`Image received: ${imageSrc}`); 
 			done();
 		});
 	}

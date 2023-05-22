@@ -2,7 +2,6 @@
 // g++ -std=c++14 -O2 ./send.cpp -o ./send -L/usr/local/include/opencv2/ -lopencv_videoio -lopencv_core -lopencv_imgcodecs -lpaho-mqttpp3 -lpaho-mqtt3as
 
 #include <iostream>
-#include <fstream>
 #include <algorithm>
 #include <cstring>
 #include <cstdlib>
@@ -27,18 +26,8 @@ using json = nlohmann::json;
 
 int main()
 {
-    ifstream configFile("config.txt");
-    string line;
-    string client_address;
-    string client_id;
-    while(getline(configFile, line)) {
-    	if (line.substr(0, 11) == "IP_ADDRESS=") {
-		client_address = line.substr(11);
-	}
-	if (line.substr(0, 10) == "CLIENT_ID=") {
-		client_id = line.substr(10);
-	}
-    }
+    const string client_address = "tcp://192.168.110.137:1883";
+    const string client_id = "kmg_pub";
 
     mqtt::async_client cli(client_address, client_id);
     cli.connect()->wait();
@@ -75,17 +64,9 @@ int main()
     for (;;)
     {
         Mat frame;
+        frame.reserve(200000);
         cap.read(frame);
         const auto tframe = chrono::high_resolution_clock::now().time_since_epoch().count();
-
-        struct __attribute__((__packed__)) HEADER
-        {
-            int bufsz;
-            uint64_t stamp;
-        } tmp;
-
-        // const auto tframe = chrono::duration_cast<chrono::nanoseconds>(t - t0).count();
-        // cout << tframe << " ms\n";
         if (frame.empty())
         {
             cerr << "ERROR! blank frame grabbed\n";
@@ -95,13 +76,11 @@ int main()
         vector<uchar> buffer;
         buffer.reserve(200000);
         imencode(".jpg", frame, buffer);
-        tmp.bufsz = buffer.size();
-        tmp.stamp = tframe;
-        buffer.insert(buffer.begin(), (uchar *)(&tmp), (uchar *)(&tmp) + sizeof(tmp));
 
-        mqtt::token_ptr tok = topic.publish(string(buffer.begin(), buffer.end()));
-        tok->wait();
-        
+        json data;
+        data["stamp"] = tframe;
+        data["image"] = buffer;
+        topic.publish(data.dump());
         cout << buffer.size() << "\n";
     }
 

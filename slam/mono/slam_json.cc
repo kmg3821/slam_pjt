@@ -1,3 +1,5 @@
+// json 쓰면 느리다.
+
 
 #include <iostream>
 #include <unistd.h>
@@ -46,21 +48,28 @@ int main()
     cli.subscribe(topic, qos)->wait();
     cli.start_consuming();
 
-    thread thPoints(occupancy_grid, ref(SLAM));
+    //thread thPoints(occupancy_grid, ref(SLAM));
 
     for (;;)
     {
-        struct __attribute__((__packed__)) HEADER
-        {
-            int img_size;
-            uint64_t stamp;
-        } tmp;
-
         const mqtt::const_message_ptr msg_ptr = cli.consume_message();
-        const auto data = msg_ptr->to_string();
-        memcpy(&tmp, data.data(), sizeof(tmp));
-        const vector<uchar> buffer(data.begin() + sizeof(tmp), data.end());
-        const uint64_t stamp = tmp.stamp;
+        if(msg_ptr == nullptr)
+        {
+            cout << "mqtt failed\n";
+            if(!cli.is_connected())
+            {
+                cout << "reconnecting...\n";
+                cli.connect(conn_opts)->wait();
+                cout << "reconnected\n";
+                cli.subscribe(topic, qos)->wait();
+                cli.start_consuming();
+                continue;
+            }
+            break;
+        }
+        const json msg = json::parse(msg_ptr->to_string());
+        const vector<uchar> buffer(msg["image"].begin(), msg["image"].end());
+        const uint64_t stamp = stoull(to_string(msg["stamp"]));
 
         // decode image data
         Mat image = imdecode(buffer, IMREAD_COLOR);
@@ -77,7 +86,7 @@ int main()
         // cout << "Elapsed time in milliseconds: " << dt << "ms\n";
     }
     flag = 0;
-    thPoints.join();
+    //thPoints.join();
     cli.disconnect();
     SLAM.Shutdown();
 
