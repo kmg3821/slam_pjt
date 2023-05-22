@@ -2,6 +2,7 @@
 // g++ -std=c++14 -O2 ./send.cpp -o ./send -L/usr/local/include/opencv2/ -lopencv_videoio -lopencv_core -lopencv_imgcodecs -lpaho-mqttpp3 -lpaho-mqtt3as
 
 #include <iostream>
+#include <fstream>
 #include <algorithm>
 #include <cstring>
 #include <cstdlib>
@@ -26,8 +27,18 @@ using json = nlohmann::json;
 
 int main()
 {
-    const string client_address = "tcp://192.168.219.157:1883";
-    const string client_id = "kmg_pub";
+    ifstream configFile("config.txt");
+    string line;
+    string client_address;
+    string client_id;
+    while(getline(configFile, line)) {
+    	if (line.substr(0, 11) == "IP_ADDRESS=") {
+		client_address = line.substr(11);
+	}
+	if (line.substr(0, 10) == "CLIENT_ID=") {
+		client_id = line.substr(10);
+	}
+    }
 
     mqtt::async_client cli(client_address, client_id);
     cli.connect()->wait();
