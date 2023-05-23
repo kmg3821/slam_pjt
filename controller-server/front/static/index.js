@@ -30,6 +30,9 @@ const getImage = async function(){
 		const image = await axios.get(backend + imageUrl);
 		imagePlaceholder.style.backgroundImage = `url('${image}')`;
 	}
+	else{
+		imagePlaceholder.style.backgroundImage = `placeholder.png`;
+	}
 	setTimeout(getImage, "100");
 }
 
@@ -43,7 +46,6 @@ eventList.forEach((item)=>{
 			key: item[1],
 			pushed: true,
 		};
-		console.log(body);
 		axios.post(backend + "/event", body);
 	});
 });
@@ -54,7 +56,6 @@ eventList.forEach((item)=>{
 			key: item[1],
 			pushed: false,
 		};
-		console.log(body);
 		axios.post(backend + "/event", body);
 	});
 });
