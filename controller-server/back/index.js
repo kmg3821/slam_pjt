@@ -1,19 +1,21 @@
-const mqtt = require('mqtt');
-const fs = require('fs');
+const mqtt      = require('mqtt');
+const fs        = require('fs');
 const AsyncLock = require('async-lock');
-const express = require('express');
-const cors = require('cors');
-const morgan = require('morgan');
+const express   = require('express');
+const cors      = require('cors');
+const morgan    = require('morgan');
+const config    = require('../../config/config.js');
+const env       = new config('../../config/config.txt');
 
-const backend_port = 8081;
+const backend_port = Number(env.get('BACKEND_PORT'));
 var imageSrc = null;
 var imageList = []
 
 const lock = new AsyncLock();
 const app = express();
 const client = mqtt.connect({
-	host: '127.0.0.1',
-	port: 1883,
+	host: env.get('MQTT_BROKER_IP'),
+	port: Number(env.get('MQTT_BROKER_PORT')),
 	protocol: 'mqtt',
 });
 
