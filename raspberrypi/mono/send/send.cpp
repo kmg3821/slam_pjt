@@ -25,23 +25,23 @@ using namespace cv;
 
 int main()
 {
-    ifstream configFile("config.txt");
+    ifstream configFile("../../../config/config.txt");
     string line;
     string client_address;
-    string client_id="";
+    string client_port;
     while(getline(configFile, line)) {
-    	if (line.substr(0, 11) == "IP_ADDRESS=") {
-		client_address = line.substr(11);
+    	if (line.substr(0, 15) == "MQTT_BROKER_IP=") {
+		client_address = line.substr(15);
 	}
-	if (line.substr(0, 10) == "CLIENT_ID=") {
-		client_id = line.substr(10);
+	if (line.substr(0, 17) == "MQTT_BROKER_PORT=") {
+		client_port = line.substr(17);
 	}
     }
     if(client_address == ""){
     	cerr << "IP_ADDRESS NOT SET. Please write config.txt as format in config-stub.txt" << endl;
 	return EXIT_FAILURE;
     }
-    mqtt::async_client cli(client_address, client_id);
+    mqtt::async_client cli(client_address + ":" + client_port, "pub_send");
     cli.connect()->wait();
     mqtt::topic topic(cli, "img", 0);
 
