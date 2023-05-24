@@ -54,9 +54,9 @@ int main()
         return EXIT_FAILURE;
     }
 
-    system("v4l2-ctl -c brightness=85"); // 0 ~ 100, default = 50
-    system("v4l2-ctl -c contrast=80");   // -100 ~ 100, default = 0
-    system("v4l2-ctl -c saturation=80"); // -100 ~ 100, default = 0
+    system("v4l2-ctl -c brightness=75"); // 0 ~ 100, default = 50
+    system("v4l2-ctl -c contrast=100");   // -100 ~ 100, default = 0
+    system("v4l2-ctl -c saturation=100"); // -100 ~ 100, default = 0
     system("v4l2-ctl -c sharpness=100"); // 예리함 정도
     system("v4l2-ctl -c rotate=180");    // 회전
 
