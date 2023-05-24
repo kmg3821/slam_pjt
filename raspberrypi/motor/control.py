@@ -10,17 +10,21 @@ import signal
 from Raspi_MotorHAT import Raspi_MotorHAT, Raspi_DCMotor
 from Raspi_PWM_Servo_Driver import PWM
 import paho.mqtt.client as mqtt
-import dotenv
+from config import config
 from time import sleep
 
+env = config('../../config/config.txt')
 
 mh = Raspi_MotorHAT(addr=0x6f) 
-myMotor = mh.getMotor(2) #핀번호
+myMotor = mh.getMotor(int(env.get('MOTOR_PIN'))) #핀번호
 servo = PWM(0x6F)
 servo.setPWMFreq(60)  # Set frequency to 60 Hz
-MIN = 230
-MAX = 370
-POS = 300
+MIN = int(env.get('MOTOR_LEFT_LIMIT'))
+MAX = int(env.get('MOTOR_RIGHT_LIMIT'))
+CENTER = int(env.get('MOTOR_CENTER'))
+SPEED = int(env.get('MOTOR_SPEED'))
+
+POS = CENTER
 lrspeed = 0
 lrthread = None
 
@@ -30,7 +34,7 @@ def terminate(signum, frame):
     exit(0)
 
 def GO():
-    myMotor.setSpeed(200)
+    myMotor.setSpeed(SPEED)
     myMotor.run(Raspi_MotorHAT.FORWARD)
     
 def LEFT():
@@ -54,7 +58,7 @@ def UPDATELR():
 
 
 def BACK():
-    myMotor.setSpeed(200)
+    myMotor.setSpeed(SPEED)
     myMotor.run(Raspi_MotorHAT.BACKWARD)
 
 def STOP():
@@ -64,7 +68,7 @@ def STOP():
     #servo.setPWM(0, 0, 345)
 
 def MIDDLE():
-    servo.setPWM(0, 0, 300)
+    servo.setPWM(0, 0, CENTER)
 
 def on_message(client, userdata, message):
     print(f"[MQTT {message.topic}]: {str(message.payload.decode('utf-8'))}")
@@ -80,10 +84,8 @@ def on_message(client, userdata, message):
         RIGHT();
 
 if __name__ == '__main__':
-    dotenv.load_dotenv(dotenv.find_dotenv())
-    modelServer = os.getenv('modelServer')
-    broker_address = modelServer
-    port = 1883
+    broker_address = env.get('MQTT_BROKER_IP')
+    port = int(env.get('MQTT_BROKER_PORT'))
     client = mqtt.Client()
     print(f"{broker_address}:{port}")
     client.connect(host = broker_address, port=port);

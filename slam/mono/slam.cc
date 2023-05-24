@@ -1,5 +1,5 @@
-
 #include <iostream>
+#include <fstream>
 #include <unistd.h>
 #include <string>
 #include <chrono>
@@ -31,10 +31,21 @@ void occupancy_grid(ORB_SLAM3::System &SLAM);
 int main()
 {
     ORB_SLAM3::System SLAM(VOCA_PATH, CAM_INTRINSIC, ORB_SLAM3::System::MONOCULAR, true);
-
-    const string server_address = "tcp://192.168.110.137:1883";
+    ifstream configFile("../../config/config.txt");
+    string line;
+    string server_ip;
+    string server_port;
+    while(getline(configFile, line)){
+    	if (line.substr(0, 15) == "MQTT_BROKER_IP="){
+		server_ip = line.substr(15);
+	}
+	if (line.substr(0, 17) == "MQTT_BROKER_PORT="){
+		server_port = line.substr(17);
+	}
+    }
+    const string server_address = "tcp://" + server_ip + ":" + server_port;
     const string client_id = "kmg_sub";
-    const string topic = "kmg_img";
+    const string topic = "img";
     const int qos = 0;
 
     mqtt::async_client cli(server_address, client_id);

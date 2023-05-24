@@ -1,26 +1,20 @@
-const modelServer      = env['modelServer']
-const modelPort        = 8081
+const getEnv = function(){
+	const promise = axios.get('/back')
+	const data = promise.then((res)=>{
+		return {'ip':res.data['ip'], 'port':res.data['port']};
+	});
+	return data;
+}
 
-const backend          = "http://" + modelServer + ":" + modelPort;
-
-const imagePlaceholder = document.querySelector(".camera");
-const topButton        = document.querySelector(".btn-top");
-const leftButton       = document.querySelector(".btn-left");
-const rightButton      = document.querySelector(".btn-right");
-const downButton       = document.querySelector(".btn-down");
-
-
-const getImage = async function(){
+const getImage = async function(backend){
+	const imagePlaceholder = document.querySelector(".camera");
 	let ok = false;
 	let imageUrl = null;
 	await axios.get(backend + "/image/recent")
 	.then((res)=>{
 		if(res.status === 200){
-			console.log(res.data);
-			console.log(res.data['image']);
 			imageUrl = res.data['image'];
 			imagePlaceholder.src = backend + '/' + imageUrl;
-			console.log(backend + '/' + imageUrl);
 		}
 	})
 	.catch((error)=>{
@@ -30,31 +24,47 @@ const getImage = async function(){
 		const image = await axios.get(backend + imageUrl);
 		imagePlaceholder.style.backgroundImage = `url('${image}')`;
 	}
-	setTimeout(getImage, "100");
+	else{
+		imagePlaceholder.style.backgroundImage = `placeholder.png`;
+	}
+	setTimeout(getImage, "100", backend);
 }
 
-getImage();
-
-eventList = [[topButton, "top"], [downButton, "bottom"], [leftButton, "left"], [rightButton, "right"]];
-
-eventList.forEach((item)=>{
-	item[0].addEventListener('pointerdown', ()=>{
-		const body = {
-			key: item[1],
-			pushed: true,
-		};
-		console.log(body);
-		axios.post(backend + "/event", body);
+const main = async function(){
+	const env = await getEnv();
+	console.log(env);
+	const backend = `http://${env['ip']}:${env['port']}`;
+	console.log("backend", backend);
+	const topButton        = document.querySelector(".btn-top");
+	const leftButton       = document.querySelector(".btn-left");
+	const rightButton      = document.querySelector(".btn-right");
+	const downButton       = document.querySelector(".btn-down");
+	const eventList        = [
+		[topButton, "top"],
+		[downButton, "bottom"],
+		[leftButton, "left"],
+		[rightButton, "right"]
+	];
+	eventList.forEach((item)=>{
+		item[0].addEventListener('pointerdown', ()=>{
+			const body = {
+				key: item[1],
+				pushed: true,
+			};
+			axios.post(backend + "/event", body);
+		});
 	});
-});
 
-eventList.forEach((item)=>{
-	item[0].addEventListener('pointerup', ()=>{
-		const body = {
-			key: item[1],
-			pushed: false,
-		};
-		console.log(body);
-		axios.post(backend + "/event", body);
+	eventList.forEach((item)=>{
+		item[0].addEventListener('pointerup', ()=>{
+			const body = {
+				key: item[1],
+				pushed: false,
+			};
+			axios.post(backend + "/event", body);
+		});
 	});
-});
+	getImage(backend);
+}
+
+main();

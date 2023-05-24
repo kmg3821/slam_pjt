@@ -25,23 +25,24 @@ using namespace cv;
 
 int main()
 {
-    ifstream configFile("config.txt");
+    ifstream configFile("../../../config/config.txt");
     string line;
     string client_address;
-    string client_id="";
+    string client_port;
     while(getline(configFile, line)) {
-    	if (line.substr(0, 11) == "IP_ADDRESS=") {
-		client_address = line.substr(11);
+    	if (line.substr(0, 15) == "MQTT_BROKER_IP=") {
+		client_address = line.substr(15);
 	}
-	if (line.substr(0, 10) == "CLIENT_ID=") {
-		client_id = line.substr(10);
+	if (line.substr(0, 17) == "MQTT_BROKER_PORT=") {
+		client_port = line.substr(17);
 	}
     }
     if(client_address == ""){
     	cerr << "IP_ADDRESS NOT SET. Please write config.txt as format in config-stub.txt" << endl;
 	return EXIT_FAILURE;
     }
-    mqtt::async_client cli(client_address, client_id);
+    cout << "Connected MQTT Broker on " << client_address << ":" << client_port << endl;
+    mqtt::async_client cli(client_address + ":" + client_port, "pub_send");
     cli.connect()->wait();
     mqtt::topic topic(cli, "img", 0);
 
@@ -73,6 +74,8 @@ int main()
     // const auto t0 = chrono::high_resolution_clock::now();
     //  for(int i = 0; i < 20; ++i)
     bool flag = 0;
+    vector<uchar> buffer;
+    uchar header[12];
     for (;;)
     {
     	Mat frame;
@@ -88,23 +91,19 @@ int main()
             cerr << "ERROR! blank frame grabbed\n";
             break;
         }
-	vector<uchar> buffer;
-	buffer.reserve(200000);
         imencode(".jpg", frame, buffer);
         bufsz = buffer.size();
         stamp = tframe;
-	for(int i = 0;i < 2;i++){
-	    uchar buf = cbufsz[i];
-	    cbufsz[i] = cbufsz[3 - i];
-	    cbufsz[3 - i] = buf;
-	}
+
 	for(int i = 0;i < 4;i++){
-	    uchar buf = cstamp[i];
-	    cstamp[i] = cstamp[7 - i];
-	    cstamp[7-i] = buf;
+	    header[i] = cbufsz[3-i];
 	}
-	buffer.insert(buffer.begin(), (uchar *)(&stamp), (uchar *)(&stamp) + sizeof(stamp));
-	buffer.insert(buffer.begin(), (uchar *)(&bufsz), (uchar *)(&bufsz) + sizeof(bufsz));
+	for(int i = 0;i < 8;i++){
+	    header[4 + i] = cstamp[7-i];
+	}
+
+	buffer.insert(buffer.begin(), header, header+12);
+	
 	try{
 	    mqtt::token_ptr tok = topic.publish(string(buffer.begin(), buffer.end()));
 	    tok->wait();
