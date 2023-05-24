@@ -1,6 +1,7 @@
 const FRAME = 20;
 const imagePlaceholder = document.querySelector(".camera");
-const fpsPlaceholder = document.querySelector(".fps");
+const fpsPlaceholder   = document.querySelector(".fps");
+const body             = document.querySelector('body');
 
 class FPSManager{
 	constructor() {
@@ -67,13 +68,15 @@ const main = async function(){
 	const leftButton       = document.querySelector(".btn-left");
 	const rightButton      = document.querySelector(".btn-right");
 	const downButton       = document.querySelector(".btn-down");
-	const eventList        = [
+	const alignButton      = document.querySelector(".btn-align");
+	const btnEventList        = [
 		[topButton, "top"],
 		[downButton, "bottom"],
 		[leftButton, "left"],
-		[rightButton, "right"]
+		[rightButton, "right"],
+		[alignButton, "align"],
 	];
-	eventList.forEach((item)=>{
+	btnEventList.forEach((item)=>{
 		item[0].addEventListener('pointerdown', ()=>{
 			const body = {
 				key: item[1],
@@ -83,13 +86,42 @@ const main = async function(){
 		});
 	});
 
-	eventList.forEach((item)=>{
+	btnEventList.forEach((item)=>{
 		item[0].addEventListener('pointerup', ()=>{
 			const body = {
 				key: item[1],
 				pushed: false,
 			};
 			axios.post(backend + "/event", body);
+		});
+	});
+	const keyEventList = [
+		['ArrowUp', 'top'],
+		['ArrowDown', 'bottom'],
+		['ArrowLeft', 'left'],
+		['ArrowRight', 'right'],
+		[' ', 'align'],
+	];
+	body.addEventListener('keydown', (event)=>{
+		keyEventList.forEach((keyEvent)=>{
+			if(event.key === keyEvent[0]){
+				const body = {
+					key: keyEvent[1],
+					pushed: true,
+				};
+				axios.post(backend + "/event", body);
+			}
+		});
+	});
+	body.addEventListener('keyup', ()=>{
+		keyEventList.forEach((keyEvent)=>{
+			if(event.key === keyEvent[0]){
+				const body = {
+					key: keyEvent[1],
+					pushed: false,
+				}
+				axios.post(backend + "/event", body);
+			}
 		});
 	});
 	const fpsmanager = new FPSManager();
