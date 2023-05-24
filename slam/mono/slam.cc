@@ -31,6 +31,7 @@ void occupancy_grid(ORB_SLAM3::System &SLAM);
 int main()
 {
     ORB_SLAM3::System SLAM(VOCA_PATH, CAM_INTRINSIC, ORB_SLAM3::System::MONOCULAR, true);
+
     ifstream configFile("../../config/config.txt");
     string line;
     string server_ip;
@@ -58,20 +59,26 @@ int main()
     cli.start_consuming();
 
     thread thPoints(occupancy_grid, ref(SLAM));
+    cout << server_address << endl;
 
     for (;;)
     {
-        struct __attribute__((__packed__)) HEADER
-        {
-            int img_size;
-            uint64_t stamp;
-        } tmp;
+        uint32_t bufsz;
+        uchar* cbufsz = (uchar*)&bufsz;
+        uint64_t stamp;
+        uchar* cstamp = (uchar*)&stamp;
 
         const mqtt::const_message_ptr msg_ptr = cli.consume_message();
         const auto data = msg_ptr->to_string();
-        memcpy(&tmp, data.data(), sizeof(tmp));
-        const vector<uchar> buffer(data.begin() + sizeof(tmp), data.end());
-        const uint64_t stamp = tmp.stamp;
+        for(int i = 0; i < 4; i++)
+        {
+            cbufsz[i] = data[3 - i];
+        }
+        for(int i = 0; i < 8; i++)
+        {
+            cstamp[i] = data[sizeof(bufsz) + sizeof(stamp) - 1 - i];
+        }
+        const vector<uchar> buffer(data.begin() + sizeof(bufsz) + sizeof(stamp), data.end());
 
         // decode image data
         Mat image = imdecode(buffer, IMREAD_COLOR);
