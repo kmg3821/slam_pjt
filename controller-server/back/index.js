@@ -41,7 +41,7 @@ const main = function(){
 	app.use('/image', express.static('image'))
 
     app.get('/image/recent', (req,res)=>GetRecentImage(req, res));
-	app.get('/event', (req,res)=>PostEvent(req, res));
+	app.post('/event', (req,res)=>PostEvent(req, res));
 	
 	const messageHandler = new MQTTMessageHandler();
 	messageHandler.addHandler('img', (message)=>messageImgHandler(message));
