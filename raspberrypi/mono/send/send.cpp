@@ -71,6 +71,8 @@ int main()
 
     system("v4l2-ctl -p 20"); // fps
 
+    const vector<int> params{ IMWRITE_JPEG_QUALITY, 30 }; // Adjust JPEG quality as needed
+
     // const auto t0 = chrono::high_resolution_clock::now();
     //  for(int i = 0; i < 20; ++i)
     bool flag = 0;
@@ -91,7 +93,7 @@ int main()
             cerr << "ERROR! blank frame grabbed\n";
             break;
         }
-        imencode(".jpg", frame, buffer);
+        imencode(".jpg", frame, buffer, params);
         bufsz = buffer.size();
         stamp = tframe;
 
