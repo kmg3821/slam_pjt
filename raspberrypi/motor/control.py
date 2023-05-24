@@ -62,26 +62,35 @@ def BACK():
     myMotor.run(Raspi_MotorHAT.BACKWARD)
 
 def STOP():
-    global lrspeed
     myMotor.run(Raspi_MotorHAT.RELEASE)
+
+def LRSTOP():
+    global lrspeed
     lrspeed = 0
-    #servo.setPWM(0, 0, 345)
 
 def MIDDLE():
+    global lrspeed, POS, CENTER
+    POS = CENTER
+    lrspeed = 0
     servo.setPWM(0, 0, CENTER)
 
 def on_message(client, userdata, message):
     print(f"[MQTT {message.topic}]: {str(message.payload.decode('utf-8'))}")
     if str(message.payload.decode('utf-8')) == '0':
-        STOP();
+        if message.topic == 'rc/top' or message.topic == 'rc/bottom':
+            STOP()
+        elif message.topic == 'rc/left' or message.topic == 'rc/right':
+            LRSTOP()
     elif message.topic == 'rc/top':
-        GO();
+        GO()
     elif message.topic == 'rc/bottom':
-        BACK();
+        BACK()
     elif message.topic == 'rc/left':
-        LEFT();
+        LEFT()
     elif message.topic == 'rc/right':
-        RIGHT();
+        RIGHT()
+    elif message.topic == 'rc/align':
+        MIDDLE()
 
 if __name__ == '__main__':
     broker_address = env.get('MQTT_BROKER_IP')
