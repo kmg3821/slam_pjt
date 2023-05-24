@@ -28,6 +28,8 @@ POS = CENTER
 lrspeed = 0
 lrthread = None
 
+client = mqtt.Client()
+
 def terminate(signum, frame):
     if lrthread:
         lrthread.cancel()
@@ -46,13 +48,16 @@ def RIGHT():
     lrspeed = 10
 
 def UPDATELR():
-    global MIN, MAX, POS, lrspeed, lrthread
+    global MIN, MAX, POS, lrspeed, lrthread, client
+    PREVPOS = POS
     POS += lrspeed
     if POS < MIN:
         POS = MIN
     elif POS > MAX:
         POS = MAX
     servo.setPWM(0, 0, POS)
+    if(PREVPOS != POS):
+        client.publish('rc/steering', POS)
     lrthread = threading.Timer(0.05, UPDATELR)
     lrthread.start()
 
@@ -71,7 +76,6 @@ def MIDDLE():
     servo.setPWM(0, 0, CENTER)
 
 def on_message(client, userdata, message):
-    print(f"[MQTT {message.topic}]: {str(message.payload.decode('utf-8'))}")
     if str(message.payload.decode('utf-8')) == '0':
         STOP();
     elif message.topic == 'rc/top':
@@ -86,7 +90,6 @@ def on_message(client, userdata, message):
 if __name__ == '__main__':
     broker_address = env.get('MQTT_BROKER_IP')
     port = int(env.get('MQTT_BROKER_PORT'))
-    client = mqtt.Client()
     print(f"{broker_address}:{port}")
     client.connect(host = broker_address, port=port);
     client.subscribe("rc/+")
