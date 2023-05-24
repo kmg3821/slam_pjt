@@ -41,6 +41,7 @@ int main()
     	cerr << "IP_ADDRESS NOT SET. Please write config.txt as format in config-stub.txt" << endl;
 	return EXIT_FAILURE;
     }
+    cout << "Connected MQTT Broker on " << client_address << ":" << client_port << endl;
     mqtt::async_client cli(client_address + ":" + client_port, "pub_send");
     cli.connect()->wait();
     mqtt::topic topic(cli, "img", 0);
@@ -90,8 +91,6 @@ int main()
             cerr << "ERROR! blank frame grabbed\n";
             break;
         }
-	vector<uchar> buffer;
-	buffer.reserve(20000);
         imencode(".jpg", frame, buffer);
         bufsz = buffer.size();
         stamp = tframe;
