@@ -1,4 +1,4 @@
-# slam_pjt
+# RC카_pjt
 orb slam3 runs on a remote computer
 ![slam1](https://github.com/kmg3821/slam_pjt/assets/52714442/11163599-bf98-4230-818c-cd516e0a470f)
 
