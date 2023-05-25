@@ -21,7 +21,7 @@ using json = nlohmann::json;
 
 const int cell_size = 800;
 atomic<unsigned long long> atomic_cnts[2][cell_size][cell_size]; // 0:visited, 1:occupied
-bool flag = 2;
+bool flag = 1;
 Sophus::SE3f now;
 bool check_boundary(int r, int c);
 void bresenham(int r1, int c1, int r2, int c2);
@@ -307,10 +307,16 @@ void occupancy_grid(ORB_SLAM3::System &SLAM)
             const auto p = mps[i]->GetWorldPos();
             const int c = cell_size / 2 + (int)(p(0) / res); // x
             const int r = cell_size / 2 - (int)(p(2) / res); // y
+            const int z = (int)(p(1) / res); // z
 
             const auto p0 = mps[i]->GetReferenceKeyFrame()->GetPose().inverse().translation();
             const int c0 = cell_size / 2 + (int)(p0(0) / res); // x
             const int r0 = cell_size / 2 - (int)(p0(2) / res); // y
+            const int z0 = (int)(p0(1) / res); // z
+
+            // cut height above 1 meter
+            if(abs(z - z0) > (int)(1.f / res))
+                continue;
 
             bresenham(r0, c0, r, c);
         }
